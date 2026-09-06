@@ -5,7 +5,7 @@
 ![Recent games and resume](docs/screenshots/recent-games.png)
 ![Footer and legal reminder](docs/screenshots/footer-legal.png)
 
-**Fetch. Play. No server shelf.**
+**Fetch. Play. No server.**
 
 Fetchcade is a browser-first retro-game launcher. Search Internet Archive, choose an item with a likely playable file, and hand that file to [Koin.js](https://github.com/muditjuneja/koin), with [Nostalgist.js](https://github.com/arianrhodsandlot/nostalgist) powering the browser emulation layer.
 

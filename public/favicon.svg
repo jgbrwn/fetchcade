@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">Fetchcade</title>
+  <desc id="desc">FC initials in a dark rounded square</desc>
+  <defs>
+    <linearGradient id="bg" x1="8" y1="8" x2="56" y2="56" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#172331" />
+      <stop offset="1" stop-color="#0b1018" />
+    </linearGradient>
+    <linearGradient id="mark" x1="14" y1="17" x2="51" y2="48" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#9dffcf" />
+      <stop offset="1" stop-color="#ae9cff" />
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#bg)" />
+  <rect x="3" y="3" width="58" height="58" rx="13" fill="none" stroke="#9dffcf" stroke-opacity=".28" stroke-width="2" />
+  <path d="M14 17h19v7H22v6h10v7H22v10h-8V17Z" fill="url(#mark)" />
+  <path d="M51 17H40c-7.18 0-12 4.82-12 15s4.82 15 12 15h11v-7H41c-3.33 0-5-2.67-5-8s1.67-8 5-8h10v-7Z" fill="url(#mark)" />
+  <circle cx="52" cy="13" r="3" fill="#ffb476" />
+</svg>

@@ -333,7 +333,7 @@ export default function App() {
   const playerRef = useRef(null);
 
   useEffect(() => {
-    document.title = `${APP_NAME} — Fetch. Play. No server shelf.`;
+    document.title = `${APP_NAME} -- Fetch. Play. No server`;
     Promise.all([loadCacheInfo(), pruneRecentGames()]).then(([info, recent]) => {
       setCacheInfo(info);
       setRecentGames(recent);
@@ -660,10 +660,10 @@ export default function App() {
           <div className="hero-kicker">A temporary arcade for the open web</div>
           <h1>Fetch a game.<br /><em>Play it now.</em></h1>
           <p className="hero-copy">
-            Search Internet Archive or bring a known link. Fetchcade sends the game to your browser—no server-side ROM shelf; optional replay caching stays under your control. <a href={KOIN_PROJECT_URL} target="_blank" rel="noreferrer">Koin.js</a> provides the player and touch controls, while <a href={NOSTALGIST_PROJECT_URL} target="_blank" rel="noreferrer">Nostalgist.js</a> powers the browser emulation layer.
+            Search Internet Archive or bring a known link. Fetchcade sends the game to your browser—no server-side ROM library; optional replay caching stays under your control. <a href={KOIN_PROJECT_URL} target="_blank" rel="noreferrer">Koin.js</a> provides the player and touch controls, while <a href={NOSTALGIST_PROJECT_URL} target="_blank" rel="noreferrer">Nostalgist.js</a> powers the browser emulation layer.
           </p>
           <div className="hero-chips" aria-label="Product features">
-            <span>Archive powered</span><span>Touch ready</span><span>No server-side library</span>
+            <span>Archive powered</span><span>Touch ready</span><span>No server library</span>
           </div>
         </section>
 
@@ -842,7 +842,7 @@ export default function App() {
           <div className="section-heading">
             <div>
               <p className="eyebrow">THE IDEA</p>
-              <h2 id="how-heading">No server shelf. Your browser, your choice.</h2>
+              <h2 id="how-heading">No server. Your browser, your choice.</h2>
             </div>
           </div>
           <div className="how-grid">
@@ -855,7 +855,7 @@ export default function App() {
 
         <footer className="site-footer">
           <div className="footer-left">
-            <span>Fetch. Play. No server shelf.</span>
+            <span>Fetch. Play. No server.</span>
             <span>Use only software you are legally authorized to access.</span>
           </div>
           <div className="footer-right">
