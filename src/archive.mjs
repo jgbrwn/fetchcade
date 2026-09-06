@@ -2,19 +2,36 @@ export const APP_NAME = "Fetchcade";
 export const DEMO_URL = "https://raw.githubusercontent.com/TeneoPython01/nes-game-01/main/game.nes";
 
 export const SYSTEM_OPTIONS = [
-  { value: "auto", label: "Auto from file name" },
+  { value: "auto", label: "Auto when unambiguous" },
   { value: "NES", label: "NES / Famicom" },
   { value: "SNES", label: "SNES / Super Famicom" },
-  { value: "GENESIS", label: "Sega Genesis / Mega Drive" },
-  { value: "MASTER_SYSTEM", label: "Master System" },
-  { value: "GAME_GEAR", label: "Game Gear" },
+  { value: "N64", label: "Nintendo 64" },
   { value: "GB", label: "Game Boy" },
   { value: "GBC", label: "Game Boy Color" },
   { value: "GBA", label: "Game Boy Advance" },
+  { value: "NDS", label: "Nintendo DS" },
+  { value: "VIRTUAL_BOY", label: "Virtual Boy" },
+  { value: "SATURN", label: "Sega Saturn" },
+  { value: "GENESIS", label: "Sega Genesis / Mega Drive" },
+  { value: "MASTER_SYSTEM", label: "Sega Master System" },
+  { value: "GAME_GEAR", label: "Sega Game Gear" },
+  { value: "PS1", label: "PlayStation" },
+  { value: "PC_ENGINE", label: "PC Engine / TurboGrafx-16" },
+  { value: "NEOGEO", label: "Neo Geo" },
+  { value: "NEOGEO_POCKET", label: "Neo Geo Pocket" },
+  { value: "NEOGEO_POCKET_COLOR", label: "Neo Geo Pocket Color" },
+  { value: "LYNX", label: "Atari Lynx" },
+  { value: "ATARI_5200", label: "Atari 5200" },
+  { value: "ATARI_2600", label: "Atari 2600" },
+  { value: "ATARI_7800", label: "Atari 7800" },
+  { value: "WONDERSWAN", label: "WonderSwan" },
+  { value: "WONDERSWAN_COLOR", label: "WonderSwan Color" },
+  { value: "ARCADE", label: "Arcade / FBNeo" },
+  { value: "C64", label: "Commodore 64" },
 ];
 
 const ARCHIVE_HOSTS = new Set(["archive.org", "www.archive.org"]);
-const ROM_EXTENSIONS = /\.(nes|fds|sfc|smc|fig|swc|md|gen|smd|sms|gg|gb|gbc|gba|zip|7z|bin|rom)$/i;
+const ROM_EXTENSIONS = /\.(nes|fds|snes|smc|sfc|fig|swc|n64|z64|v64|gb|gbc|gba|nds|vb|cue|chd|iso|7z|gen|md|smd|sms|gg|pbp|pce|neo|ngp|ngc|lnx|lyx|a52|a26|a78|ws|wsc|zip|d64|t64|tap|prg|crt|bin|rom)$/i;
 
 function decodePathPart(part, label) {
   let decoded;
@@ -68,19 +85,12 @@ export function parseArchiveUrl(raw) {
     }
     const identifier = decodePathPart(pathParts.shift(), "identifier");
     const filenameParts = pathParts.map((part) => decodePathPart(part, "file name"));
-    if (identifier.includes("/")) {
-      throw new Error("The Archive file path is invalid.");
-    }
+    if (identifier.includes("/")) throw new Error("The Archive file path is invalid.");
     const filename = filenameParts.join("/");
     if (filename.split("/").some((part) => !part || part === "." || part === "..")) {
       throw new Error("The Archive file path is invalid.");
     }
-    return {
-      kind: "file",
-      identifier,
-      filename,
-      url: url.toString(),
-    };
+    return { kind: "file", identifier, filename, url: url.toString() };
   }
 
   throw new Error("Use an archive.org/details/... item page or archive.org/download/... file URL.");
@@ -108,21 +118,60 @@ export function buildMetadataUrl(identifier) {
   return `https://archive.org/metadata/${encodeURIComponent(identifier)}`;
 }
 
-function extensionOf(name) {
-  return String(name || "").split("?")[0].toLowerCase();
+function normalizedName(name) {
+  return String(name || "").split(/[?#]/)[0].toLowerCase();
 }
 
 export function inferSystem(name) {
-  const value = extensionOf(name);
-  if (value.endsWith(".nes") || value.endsWith(".fds") || /(^|[^a-z])nes([^a-z]|$)/i.test(value)) return "NES";
-  if (/\.(sfc|smc|fig|swc)$/.test(value) || /super[-_ ]?nintendo|snes/i.test(value)) return "SNES";
-  if (/\.(md|gen|smd)$/.test(value) || /genesis|mega[-_ ]?drive/i.test(value)) return "GENESIS";
-  if (value.endsWith(".sms") || /master[-_ ]?system/i.test(value)) return "MASTER_SYSTEM";
-  if (value.endsWith(".gg") || /game[-_ ]?gear/i.test(value)) return "GAME_GEAR";
-  if (value.endsWith(".gbc") || /game[-_ ]?boy[-_ ]?color/i.test(value)) return "GBC";
-  if (value.endsWith(".gba") || /game[-_ ]?boy[-_ ]?advance/i.test(value)) return "GBA";
-  if (value.endsWith(".gb") || /game[-_ ]?boy/i.test(value)) return "GB";
+  const value = normalizedName(name);
+  if (value.endsWith(".nes") || value.endsWith(".fds")) return "NES";
+  if (value.endsWith(".snes") || value.endsWith(".smc") || value.endsWith(".sfc") || value.endsWith(".fig") || value.endsWith(".swc")) return "SNES";
+  if (value.endsWith(".n64") || value.endsWith(".z64") || value.endsWith(".v64")) return "N64";
+  if (value.endsWith(".gbc")) return "GBC";
+  if (value.endsWith(".gba")) return "GBA";
+  if (value.endsWith(".gb")) return "GB";
+  if (value.endsWith(".nds")) return "NDS";
+  if (value.endsWith(".vb")) return "VIRTUAL_BOY";
+  if (value.endsWith(".gen") || value.endsWith(".md") || value.endsWith(".smd")) return "GENESIS";
+  if (value.endsWith(".sms")) return "MASTER_SYSTEM";
+  if (value.endsWith(".gg")) return "GAME_GEAR";
+  if (value.endsWith(".pbp")) return "PS1";
+  if (value.endsWith(".pce")) return "PC_ENGINE";
+  if (value.endsWith(".neo")) return "NEOGEO";
+  if (value.endsWith(".ngp")) return "NEOGEO_POCKET";
+  if (value.endsWith(".ngc")) return "NEOGEO_POCKET_COLOR";
+  if (value.endsWith(".lnx") || value.endsWith(".lyx")) return "LYNX";
+  if (value.endsWith(".a52")) return "ATARI_5200";
+  if (value.endsWith(".a26")) return "ATARI_2600";
+  if (value.endsWith(".a78")) return "ATARI_7800";
+  if (value.endsWith(".ws")) return "WONDERSWAN";
+  if (value.endsWith(".wsc")) return "WONDERSWAN_COLOR";
+  if (value.endsWith(".d64") || value.endsWith(".t64") || value.endsWith(".tap") || value.endsWith(".prg") || value.endsWith(".crt")) return "C64";
+
+  // Containers, raw .bin files, and disc images are intentionally ambiguous.
+  const stem = value.replace(/\.[a-z0-9]+$/, "");
+  if (/arcade|fbneo|mame/.test(stem)) return "ARCADE";
+  if (/game[-_ ]?boy[-_ ]?color/.test(stem)) return "GBC";
+  if (/game[-_ ]?boy[-_ ]?advance/.test(stem)) return "GBA";
+  if (/game[-_ ]?boy/.test(stem)) return "GB";
+  if (/super[-_ ]?nintendo|snes/.test(stem)) return "SNES";
+  if (/nintendo[-_ ]?64|\bn64\b/.test(stem)) return "N64";
+  if (/genesis|mega[-_ ]?drive/.test(stem)) return "GENESIS";
+  if (/master[-_ ]?system/.test(stem)) return "MASTER_SYSTEM";
+  if (/game[-_ ]?gear/.test(stem)) return "GAME_GEAR";
+  if (/playstation|ps1|psx/.test(stem)) return "PS1";
+  if (/nintendo[-_ ]?entertainment|famicom|\bnes\b/.test(stem)) return "NES";
   return null;
+}
+
+export function formatHint(name) {
+  const value = normalizedName(name);
+  if (value.endsWith(".zip")) return "ZIP container · choose system";
+  if (value.endsWith(".7z")) return "7z container · choose system";
+  if (value.endsWith(".cue")) return "CUE sheet · companion tracks may be needed";
+  if (value.endsWith(".iso") || value.endsWith(".chd") || value.endsWith(".pbp")) return "Disc image · BIOS may be needed";
+  if (value.endsWith(".bin") || value.endsWith(".rom")) return "Raw image · choose system if needed";
+  return "Likely supported ROM format";
 }
 
 export function isLikelyPlayableFile(file) {
@@ -146,6 +195,8 @@ export function playableFiles(metadata) {
       size: file.size ? Number(file.size) : null,
       source: file.source || "",
       system: inferSystem(file.name),
+      hint: formatHint(file.name),
+      cacheVersion: file.md5 || file.sha1 || [file.mtime, file.size].filter(Boolean).join(":"),
     }))
     .sort((a, b) => {
       const sourceOrder = (a.source === "original" ? 0 : 1) - (b.source === "original" ? 0 : 1);
@@ -154,7 +205,7 @@ export function playableFiles(metadata) {
 }
 
 export function systemLabels(files) {
-  const labels = new Map(SYSTEM_OPTIONS.slice(1).map((item) => [item.value, item.label.split(" /")[0]]));
+  const labels = new Map(SYSTEM_OPTIONS.slice(1).map((item) => [item.value, item.label]));
   return [...new Set(files.map((file) => file.system).filter(Boolean))].map((system) => labels.get(system) || system);
 }
 

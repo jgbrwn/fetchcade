@@ -9,7 +9,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "node --test",
-    "deploy": "npm run build && wrangler deploy",
+    "generate-wrangler-config": "node scripts/generate-wrangler-config.mjs",
+    "deploy": "npm run build && npm run generate-wrangler-config && wrangler deploy --config .wrangler.generated.json",
     "postinstall": "node scripts/patch-koin.mjs"
   },
   "dependencies": {

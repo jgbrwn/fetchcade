@@ -44,6 +44,15 @@ test("infers the supported console from common file names", () => {
   assert.equal(inferSystem("unknown.zip"), null);
 });
 
+test("infers the expanded console set and leaves ambiguous containers manual", () => {
+  assert.equal(inferSystem("Super Mario 64.z64"), "N64");
+  assert.equal(inferSystem("Pokemon.nds"), "NDS");
+  assert.equal(inferSystem("Final Fantasy.pbp"), "PS1");
+  assert.equal(inferSystem("arcade-set.zip"), "ARCADE");
+  assert.equal(inferSystem("game.zip"), null);
+  assert.equal(inferSystem("game.cue"), null);
+});
+
 test("filters private and non-ROM metadata files", () => {
   const files = playableFiles({ files: [
     { name: "game.nes", size: "128" },
@@ -52,6 +61,7 @@ test("filters private and non-ROM metadata files", () => {
     { name: "folder/game.sfc", source: "original", size: "256" },
   ] });
   assert.deepEqual(files.map((file) => file.name), ["folder/game.sfc", "game.nes"]);
+  assert.equal(files[0].hint, "Likely supported ROM format");
 });
 
 test("builds a constrained Archive search URL", () => {

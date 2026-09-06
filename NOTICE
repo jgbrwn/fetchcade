@@ -1,0 +1,25 @@
+# NOTICE
+
+Fetchcade includes or relies on the following third-party projects and demo material. Their licenses remain applicable to their respective code and assets.
+
+## Runtime and emulator/player software
+
+- **Koin.js 1.3.5** — MIT License — Copyright (c) 2024 Mudit Juneja. Repository: https://github.com/muditjuneja/koin
+- **Nostalgist.js 0.21.1** — MIT License — Copyright and attribution retained by the upstream project. Repository: https://github.com/arianrhodsandlot/nostalgist
+- **React / React DOM**, **Vite**, and **Cloudflare Wrangler** — see the package metadata and lockfile for the exact versions used by each build.
+
+Fetchcade applies a small install-time patch to the bundled Koin distribution to disable its optional telemetry call. The patch is in `scripts/patch-koin.mjs` and fails closed if the pinned upstream bundle changes shape.
+
+## Test/demo game
+
+The **Try MIT demo** control uses NES Diamond-Chase from:
+
+- Repository: https://github.com/TeneoPython01/nes-game-01
+- ROM URL: https://raw.githubusercontent.com/TeneoPython01/nes-game-01/main/game.nes
+- License: MIT, according to the upstream project.
+
+The demo is included only as a lawful control/emulator smoke test. It is not representative of the rights status of arbitrary Internet Archive search results.
+
+## Fonts, icons, and CDN resources
+
+Fetchcade does not bundle a third-party web font. Koin and its emulator dependencies may request their documented runtime assets from their upstream CDNs. See `package.json`, `package-lock.json`, and the upstream licenses for the precise dependency graph.
