@@ -2,9 +2,10 @@
 
 ![Fetchcade home screen](docs/screenshots/home.png)
 ![Local cache controls](docs/screenshots/cache-controls.png)
+![Recent games and resume](docs/screenshots/recent-games.png)
 ![Footer and legal reminder](docs/screenshots/footer-legal.png)
 
-**Fetch. Play. No shelf.**
+**Fetch. Play. No server shelf.**
 
 Fetchcade is a browser-first retro-game launcher. Search Internet Archive, choose an item with a likely playable file, and hand that file to [Koin.js](https://github.com/muditjuneja/koin) for a browser session.
 
@@ -17,6 +18,7 @@ Fetchcade does **not** upload ROMs, maintain a server-side ROM library, or requi
 - Koin.js controls and emulator UI, including touch controls, keyboard/gamepad input, rewind, and save-state controls where the selected core supports them.
 - An Archive-only Cloudflare Worker relay for download redirects that do not expose browser CORS headers.
 - Optional, opt-in browser-local ROM caching for faster replay. It is off by default and can be cleared from the UI.
+- A local **Recent games** list of up to 20 cached games. **Play** starts from the beginning; **Resume** loads the latest local save state when one exists.
 - Cross-origin isolation and security headers needed by the emulator cores.
 
 ## Format expectations
@@ -45,7 +47,9 @@ There are two separate storage concepts:
 
 Closing a session does not delete an intentionally enabled local cache. Stop the session before clearing it.
 
-Koin's player preferences are also browser-local and persistent for the same origin: volume, mute, shader/haptics preferences, keyboard mappings by system, and gamepad mappings by player. They do not sync between devices and can be removed by clearing site data or using private browsing. Fetchcade does not configure a save-state backend; Koin's Save/Load controls use downloadable `.state` files unless a future backend integration is added. When the optional cache is enabled, Fetchcade supplies a stable per-game ID so Koin's game-keyed preferences such as cheats can be associated with that game.
+Koin's player preferences are also browser-local and persistent for the same origin: volume, mute, shader/haptics preferences, keyboard mappings by system, and gamepad mappings by player. They do not sync between devices and can be removed by clearing site data or using private browsing. With local caching disabled, Koin's Save/Load controls use downloadable `.state` files. With local caching enabled, Fetchcade wires Save/Load and Koin's auto-save to one browser-local resume state per game. When the optional cache is enabled, Fetchcade supplies a stable per-game ID so Koin's game-keyed preferences such as cheats can be associated with that game.
+
+When local caching is enabled, Fetchcade also keeps up to 20 cached game entries in browser-local metadata. **Resume** uses the most recent local save state created by Koin's auto-save, visibility-save, or Save control. It is not a server sync service and it cannot resume a game whose local ROM/cache was cleared.
 
 ## Run locally
 

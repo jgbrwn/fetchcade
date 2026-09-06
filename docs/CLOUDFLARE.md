@@ -33,6 +33,21 @@ npm run deploy
 
 Wrangler will report the resulting `workers.dev` hostname.
 
+### For the connection screen in the screenshot
+
+Change the defaults to:
+
+- **Build command:** `npm run build && npm run generate-wrangler-config`
+- **Deploy command:** `npx wrangler deploy --config .wrangler.generated.json`
+
+In **Advanced settings**, add these Cloudflare **build-time** variables:
+
+- `FETCHCADE_WORKER_NAME` = the existing Worker name chosen in Cloudflare.
+- `FETCHCADE_CUSTOM_DOMAIN` = the existing production hostname, if any.
+
+These values are intentionally stored in the Cloudflare build configuration instead of Git. The Worker runtime Variables/Secrets panel is a different environment: runtime variables are not a reliable source for the build/deploy shell. Fetchcade currently does not require any application runtime secret, R2 binding, D1 binding, or API token during a native Cloudflare Workers Builds deployment; Cloudflare's connected build integration supplies the deployment authentication.
+
+The screenshot's plain `npm run build` / `npx wrangler deploy` may work with Cloudflare's CI name override, but it does not generate the private custom-domain config and can produce a Wrangler name-mismatch warning. Use the explicit commands above.
 ## Cloudflare Workers Builds / Git deploys
 
 To deploy automatically after pushes to `main`:

@@ -21,9 +21,17 @@ import {
   cacheStorageAvailable,
   clearRomCache,
   getCachePreference,
+  getRecentGames,
   getRomCacheInfo,
+  hasResumeState,
+  isRomCached,
+  loadResumeState,
   makeRomCacheId,
+  pruneRecentGames,
+  saveResumeState,
   setCachePreference,
+  updateRecentGame,
+  upsertRecentGame,
 } from "./cache.mjs";
 
 const SEARCH_ROWS = 20;
@@ -213,6 +221,34 @@ function FilePicker({ files, value, onChange, onPlay, disabled }) {
   );
 }
 
+function formatPlayedAt(timestamp) {
+  const date = new Date(timestamp);
+  if (!Number.isFinite(date.getTime())) return "Recently";
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function RecentGameCard({ game, onPlay, disabled }) {
+  return (
+    <article className="recent-game">
+      <div className="recent-game-copy">
+        <p className="eyebrow">{game.system} · {formatPlayedAt(game.playedAt)}</p>
+        <h3>{game.title}</h3>
+        <p className="recent-file">{displayFileName(game.filename)}{game.size ? ` · ${formatBytes(game.size)}` : ""}</p>
+      </div>
+      <div className="recent-actions">
+        {game.hasResume && (
+          <button type="button" onClick={() => onPlay(game, true)} disabled={disabled}>
+            Resume
+          </button>
+        )}
+        <button type="button" className={game.hasResume ? "button-secondary" : ""} onClick={() => onPlay(game, false)} disabled={disabled}>
+          {game.hasResume ? "Play fresh" : "Play"}
+        </button>
+      </div>
+    </article>
+  );
+}
+
 function SearchResult({ result, onPlay, disabled }) {
   const [selectedFile, setSelectedFile] = useState(result.files[0]?.name || "");
   const selected = result.files.find((file) => file.name === selectedFile) || result.files[0];
@@ -275,6 +311,7 @@ export default function App() {
   const [searchResults, setSearchResults] = useState([]);
   const [searchTotal, setSearchTotal] = useState(null);
   const [player, setPlayer] = useState(null);
+  const [recentGames, setRecentGames] = useState(() => getRecentGames());
   const [cacheGames, setCacheGames] = useState(() => getCachePreference() && cacheStorageAvailable());
   const [cacheInfo, setCacheInfo] = useState({ available: cacheStorageAvailable(), count: 0, names: [] });
   const [cacheMessage, setCacheMessage] = useState("");
@@ -283,8 +320,11 @@ export default function App() {
   const playerRef = useRef(null);
 
   useEffect(() => {
-    document.title = `${APP_NAME} — Fetch. Play. No shelf.`;
-    loadCacheInfo().then(setCacheInfo);
+    document.title = `${APP_NAME} — Fetch. Play. No server shelf.`;
+    Promise.all([loadCacheInfo(), pruneRecentGames()]).then(([info, recent]) => {
+      setCacheInfo(info);
+      setRecentGames(recent);
+    });
   }, []);
 
   useEffect(() => {
@@ -292,7 +332,9 @@ export default function App() {
   }, [player]);
 
   async function refreshCacheInfo() {
-    setCacheInfo(await loadCacheInfo());
+    const [info, recent] = await Promise.all([loadCacheInfo(), pruneRecentGames()]);
+    setCacheInfo(info);
+    setRecentGames(recent);
   }
 
   function toggleCache(event) {
@@ -317,19 +359,20 @@ export default function App() {
     }
   }
 
-  async function playFile(url, filename, label, systemOverride = null, external = false, cacheVersion = "") {
+  async function playFile(url, filename, label, systemOverride = null, external = false, cacheVersion = "", initialSaveState = null, cacheIdOverride = "") {
     const token = ++sessionToken.current;
     setBusy(true);
     setDirectStatus({ message: external ? "Checking the demo…" : "Checking the Archive file…", kind: "" });
     try {
       const parsed = external ? null : parseArchiveUrl(url);
-      const playableUrl = await findPlayableUrl(url, parsed);
+      const cachedReplay = Boolean(cacheIdOverride && await isRomCached(cacheIdOverride));
+      const playableUrl = cachedReplay ? url : await findPlayableUrl(url, parsed);
       const chosenSystem = systemOverride || (system === "auto" ? inferSystem(filename || url) : system);
       if (!chosenSystem) {
         throw new Error("This file type does not identify a console. Choose a System manually, then play it.");
       }
-      let romId = "";
-      if (!external && cacheGames && cacheStorageAvailable()) {
+      let romId = cacheIdOverride;
+      if (!romId && !external && cacheGames && cacheStorageAvailable()) {
         try {
           romId = await makeRomCacheId({ url, filename: filename || displayFileName(url), version: cacheVersion });
         } catch {
@@ -341,17 +384,73 @@ export default function App() {
       setPlayer({
         key: `${playableUrl}-${Date.now()}`,
         url: playableUrl,
+        sourceUrl: url,
         filename: filename || displayFileName(url),
         title: gameTitle,
         system: chosenSystem,
         cacheId: romId,
+        cacheVersion,
+        initialSaveState,
       });
-      setDirectStatus({ message: "Launching the player. Use Koin's controls/fullscreen affordance for the best phone layout.", kind: "success" });
+      setDirectStatus({ message: cachedReplay ? "Starting from the local game copy…" : "Launching the player. Use Koin's controls/fullscreen affordance for the best phone layout.", kind: "success" });
     } catch (error) {
       if (token === sessionToken.current) setDirectStatus({ message: errorMessage(error), kind: "error" });
     } finally {
       if (token === sessionToken.current) setBusy(false);
     }
+  }
+
+  async function recordRecentGame(currentPlayer) {
+    if (!currentPlayer?.cacheId || !await isRomCached(currentPlayer.cacheId)) return;
+    const next = upsertRecentGame({
+      cacheId: currentPlayer.cacheId,
+      sourceUrl: currentPlayer.sourceUrl,
+      filename: currentPlayer.filename,
+      title: currentPlayer.title,
+      system: currentPlayer.system,
+      cacheVersion: currentPlayer.cacheVersion || "",
+      hasResume: await hasResumeState(currentPlayer.cacheId),
+    });
+    setRecentGames(next);
+  }
+
+  async function persistPlayerState(blob) {
+    if (!player?.cacheId) return;
+    try {
+      if (await saveResumeState(player.cacheId, blob)) {
+        setRecentGames(updateRecentGame(player.cacheId, { hasResume: true, resumeUpdatedAt: Date.now() }));
+      }
+    } catch (error) {
+      setCacheMessage(`Could not save the local resume state: ${errorMessage(error)}`);
+    }
+  }
+
+  async function playRecentGame(game, resume) {
+    setSource(game.sourceUrl);
+    setTitle(game.title);
+    setSystem(game.system);
+    let initialSaveState = null;
+    if (resume) {
+      setDirectStatus({ message: "Loading the latest local resume state…", kind: "" });
+      try {
+        initialSaveState = await loadResumeState(game.cacheId);
+      } catch (error) {
+        setDirectStatus({ message: `Resume state could not be read; starting fresh (${errorMessage(error)}).`, kind: "" });
+      }
+      if (!initialSaveState) {
+        setDirectStatus({ message: "No resume state was found; starting the cached game fresh.", kind: "" });
+      }
+    }
+    await playFile(
+      game.sourceUrl,
+      game.filename,
+      game.title,
+      game.system,
+      false,
+      game.cacheVersion || "",
+      initialSaveState,
+      game.cacheId,
+    );
   }
 
   async function resolveDirect(event) {
@@ -489,11 +588,33 @@ export default function App() {
           <div className="hero-kicker">A temporary arcade for the open web</div>
           <h1>Fetch a game.<br /><em>Play it now.</em></h1>
           <p className="hero-copy">
-            Search Internet Archive or bring a known link. Fetchcade sends the game to your browser for this session—no uploads, no ROM shelf.
+            Search Internet Archive or bring a known link. Fetchcade sends the game to your browser—no server-side ROM shelf, with an optional local replay shelf you control.
           </p>
           <div className="hero-chips" aria-label="Product features">
-            <span>Archive powered</span><span>Touch ready</span><span>Nothing stored here</span>
+            <span>Archive powered</span><span>Touch ready</span><span>No server-side library</span>
           </div>
+        </section>
+
+        <section className="recent-card card" aria-labelledby="recent-heading">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">ON THIS DEVICE</p>
+              <h2 id="recent-heading">Recent games</h2>
+            </div>
+            <span className="step-mark">↻</span>
+          </div>
+          {recentGames.length ? (
+            <>
+              <p className="helper-text">Cached games stay in this browser only. Resume loads the latest local save state when one exists; Play fresh starts from the beginning.</p>
+              <div className="recent-list">
+                {recentGames.map((game) => (
+                  <RecentGameCard key={game.cacheId} game={game} onPlay={playRecentGame} disabled={busy || Boolean(player)} />
+                ))}
+              </div>
+            </>
+          ) : (
+            <p className="helper-text recent-empty">No cached games yet. Turn on the optional local replay cache below, then play a game to see up to 20 recent entries here.</p>
+          )}
         </section>
 
         <section className="search-card card-glow" aria-labelledby="search-heading">
@@ -624,16 +745,24 @@ export default function App() {
                   romId={player.cacheId || ""}
                   romUrl={player.url}
                   romFileName={player.filename}
+                  initialSaveState={player.initialSaveState || undefined}
+                  onSaveState={player.cacheId ? (_slot, blob) => persistPlayerState(blob) : undefined}
+                  onLoadState={player.cacheId ? () => loadResumeState(player.cacheId) : undefined}
+                  onAutoSave={player.cacheId ? (blob) => persistPlayerState(blob) : undefined}
+                  autoSaveInterval={player.cacheId ? 30_000 : undefined}
                   system={player.system}
                   title={player.title}
-                  onReady={() => setDirectStatus({ message: "Ready. On a phone, open Koin's controls/fullscreen affordance and rotate landscape if helpful.", kind: "success" })}
+                  onReady={() => {
+                    setDirectStatus({ message: "Ready. On a phone, open Koin's controls/fullscreen affordance and rotate landscape if helpful.", kind: "success" });
+                    recordRecentGame(player);
+                  }}
                   onError={(error) => setDirectStatus({ message: `Koin could not load this file: ${errorMessage(error)}`, kind: "error" })}
                   onExit={closePlayer}
                 />
               </PlayerErrorBoundary>
             </div>
             <p className="player-tip">Koin supplies the virtual controls, keyboard/gamepad input, rewind, and player UI. Touch controls are most comfortable after opening its controls/fullscreen affordance; browser/device fullscreen behavior varies.</p>
-            <p className="player-tip settings-persistence"><strong>Settings persist in this browser:</strong> Koin stores volume, mute, shader, haptics, keyboard mappings by system, and gamepad mappings locally for this origin. They do not sync across devices. Save-state buttons download `.state` files unless a save backend is configured.</p>
+            <p className="player-tip settings-persistence"><strong>Settings persist in this browser:</strong> Koin stores volume, mute, shader, haptics, keyboard mappings by system, and gamepad mappings locally for this origin. They do not sync across devices. Cached games auto-save a local resume state about every 30 seconds; use Koin's Save control before Stop session when you want an immediate checkpoint.</p>
           </section>
         )}
 
@@ -641,7 +770,7 @@ export default function App() {
           <div className="section-heading">
             <div>
               <p className="eyebrow">THE IDEA</p>
-              <h2 id="how-heading">No shelf. Just a session.</h2>
+              <h2 id="how-heading">No server shelf. Your browser, your choice.</h2>
             </div>
           </div>
           <div className="how-grid">
@@ -649,12 +778,12 @@ export default function App() {
             <div><span>02</span><strong>Fetch</strong><p>The browser requests the file only when you play.</p></div>
             <div><span>03</span><strong>Play</strong><p>Koin handles the controls and emulator session.</p></div>
           </div>
-          <p className="privacy-line"><span className="shield-mark">◇</span> Fetchcade has no account, upload flow, or server-side ROM library.</p>
+          <p className="privacy-line"><span className="shield-mark">◇</span> Fetchcade has no account, upload flow, or server-side ROM library; local caching is opt-in.</p>
         </section>
 
         <footer className="site-footer">
           <div className="footer-left">
-            <span>Fetchcade / prototype</span>
+            <span>Fetch. Play. No server shelf.</span>
             <span>Use only software you are legally authorized to access.</span>
           </div>
           <div className="footer-right">

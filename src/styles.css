@@ -99,7 +99,15 @@ button:not(:disabled):active { transform: translateY(0); }
 .result-play-row button, .file-picker-row button { min-height: 44px; padding-inline: 16px; }
 .field-note { color: var(--faint); font-size: 9px; }
 
-.divider-label { display: flex; align-items: center; gap: 14px; margin: 28px 0; color: var(--faint); font-size: 10px; text-transform: uppercase; letter-spacing: 0.13em; }
+.recent-card { margin-top: 28px; padding: clamp(18px, 3vw, 30px); }
+.recent-list { display: grid; gap: 9px; margin-top: 20px; }
+.recent-game { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 13px; background: rgba(8, 14, 22, 0.48); }
+.recent-game-copy { min-width: 0; }
+.recent-game h3 { margin: 5px 0 0; overflow: hidden; color: var(--ink); font-family: ui-sans-serif, system-ui, sans-serif; font-size: 16px; letter-spacing: -0.04em; text-overflow: ellipsis; white-space: nowrap; }
+.recent-file { margin: 6px 0 0; overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.recent-actions { display: flex; flex: 0 0 auto; flex-wrap: wrap; justify-content: flex-end; gap: 7px; }
+.recent-actions button { min-height: 38px; padding: 8px 12px; font-size: 10px; }
+.recent-empty { margin-bottom: 0; }
 .divider-label::before, .divider-label::after { flex: 1; height: 1px; background: var(--line); content: ""; }
 .direct-card { background: rgba(17, 24, 35, 0.72); }
 .direct-card form { margin-top: 23px; }
@@ -165,6 +173,8 @@ label { display: block; margin: 0 0 7px; color: #aab5c8; font-size: 10px; letter
   .storage-panel { flex-direction: column; }
   .storage-actions { align-items: flex-start; }
   .clear-cache-button { width: 100%; }
+  .recent-game { align-items: flex-start; flex-direction: column; }
+  .recent-actions { justify-content: flex-start; width: 100%; }
   .player-heading { align-items: flex-start; }
   .player-heading h2 { white-space: normal; }
   .player-mount, .player-mount > *, .player-mount [class*="h-full"] { min-height: 560px; }
