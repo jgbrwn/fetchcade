@@ -4,6 +4,7 @@ export const RESUME_STATE_CACHE_NAME = "fetchcade-resume-state-v1";
 export const RECENT_GAMES_KEY = "fetchcade.recent-games.v1";
 export const MAX_RECENT_GAMES = 20;
 export const CACHE_PREFERENCE_KEY = "fetchcade.cache-roms";
+export const REMOVE_CONFIRMATION_KEY = "fetchcade.confirm-remove-recent";
 export const MAX_CACHEABLE_GAME_BYTES = 512 * 1024 * 1024;
 export const CACHE_HEADROOM_BYTES = 64 * 1024 * 1024;
 
@@ -46,6 +47,22 @@ export function setCachePreference(enabled) {
     localStorage.setItem(CACHE_PREFERENCE_KEY, String(Boolean(enabled)));
   } catch {
     // The preference is optional; a private browsing context may reject it.
+  }
+}
+
+export function getRemoveConfirmationPreference() {
+  try {
+    return localStorage.getItem(REMOVE_CONFIRMATION_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+export function setRemoveConfirmationPreference(enabled) {
+  try {
+    localStorage.setItem(REMOVE_CONFIRMATION_KEY, String(Boolean(enabled)));
+  } catch {
+    // The preference is optional and should never block removal.
   }
 }
 
@@ -127,6 +144,20 @@ export function removeRecentGame(cacheId) {
   const next = getRecentGames().filter((game) => game.cacheId !== cacheId);
   persistRecentGames(next);
   return next;
+}
+
+export async function removeCachedGame(cacheId) {
+  let romEntriesRemoved = 0;
+  if (cacheStorageAvailable() && cacheId) {
+    const names = (await caches.keys()).filter((name) => name.startsWith(KOIN_ROM_CACHE_PREFIX));
+    for (const name of names) {
+      const cache = await caches.open(name);
+      if (await cache.delete(cacheId)) romEntriesRemoved += 1;
+    }
+  }
+  const resumeRemoved = await clearResumeState(cacheId);
+  removeRecentGame(cacheId);
+  return { romEntriesRemoved, resumeRemoved };
 }
 
 function resumeStateKey(cacheId) {

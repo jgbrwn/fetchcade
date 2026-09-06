@@ -28,6 +28,7 @@ import {
   clearRomCache,
   getCachePreference,
   getRecentGames,
+  getRemoveConfirmationPreference,
   getRomCacheInfo,
   getStorageEstimate,
   hasResumeState,
@@ -37,9 +38,11 @@ import {
   makeRomCacheId,
   normalizeGameSize,
   pruneRecentGames,
+  removeCachedGame,
   removeRecentGame,
   saveResumeState,
   setCachePreference,
+  setRemoveConfirmationPreference,
   updateRecentGame,
   upsertRecentGame,
 } from "./cache.mjs";
@@ -254,7 +257,7 @@ function formatPlayedAt(timestamp) {
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-function RecentGameCard({ game, onPlay, disabled }) {
+function RecentGameCard({ game, onPlay, onRemove, disabled }) {
   return (
     <article className="recent-game">
       <div className="recent-game-copy">
@@ -270,6 +273,9 @@ function RecentGameCard({ game, onPlay, disabled }) {
         )}
         <button type="button" className={game.hasResume ? "button-secondary" : ""} onClick={() => onPlay(game, false)} disabled={disabled}>
           {game.hasResume ? "Play fresh" : "Play"}
+        </button>
+        <button type="button" className="remove-button" onClick={() => onRemove(game)} disabled={disabled} title={`Remove ${game.title} from this browser's recent games and cache`}>
+          Remove
         </button>
       </div>
     </article>
@@ -412,6 +418,44 @@ function AboutModal({ open, onClose }) {
   );
 }
 
+function RemoveGameModal({ game, skipConfirmation, onSkipChange, onCancel, onConfirm }) {
+  const closeRef = useRef(null);
+
+  useEffect(() => {
+    if (!game) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    closeRef.current?.focus();
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") onCancel();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [game, onCancel]);
+
+  if (!game) return null;
+  return (
+    <div className="about-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onCancel()}>
+      <section className="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="remove-game-heading" onMouseDown={(event) => event.stopPropagation()}>
+        <p className="eyebrow">REMOVE LOCAL GAME</p>
+        <h2 id="remove-game-heading">Remove “{game.title}”?</h2>
+        <p>This removes the cached game copy, browser-local resume state, and its Recent games entry from this device. It does not delete anything from Internet Archive or Fetchcade.</p>
+        <label className="confirm-toggle">
+          <input type="checkbox" checked={skipConfirmation} onChange={(event) => onSkipChange(event.target.checked)} />
+          <span>Don’t ask again on this device</span>
+        </label>
+        <div className="confirm-actions">
+          <button ref={closeRef} type="button" className="button-secondary" onClick={onCancel}>Cancel</button>
+          <button type="button" className="remove-confirm-button" onClick={onConfirm}>Remove game</button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 export default function App() {
   const [query, setQuery] = useState("");
   const [source, setSource] = useState("");
@@ -431,6 +475,8 @@ export default function App() {
   const [cacheInfo, setCacheInfo] = useState({ available: cacheStorageAvailable(), count: 0, names: [] });
   const [cacheMessage, setCacheMessage] = useState("");
   const [aboutOpen, setAboutOpen] = useState(false);
+  const [removeGameTarget, setRemoveGameTarget] = useState(null);
+  const [skipRemoveConfirmation, setSkipRemoveConfirmation] = useState(false);
   const searchToken = useRef(0);
   const sessionToken = useRef(0);
   const playerRef = useRef(null);
@@ -473,6 +519,42 @@ export default function App() {
     } catch (error) {
       setCacheMessage(`Could not clear the local game cache: ${errorMessage(error)}`);
     }
+  }
+
+  async function removeGameNow(game) {
+    if (!game || busy || player) return;
+    setRemoveGameTarget(null);
+    setBusy(true);
+    setCacheMessage(`Removing ${game.title} from this browser…`);
+    try {
+      await removeCachedGame(game.cacheId);
+      await refreshCacheInfo();
+      setCacheMessage(`Removed ${game.title} from Recent games and the local cache.`);
+    } catch (error) {
+      setCacheMessage(`Could not remove ${game.title}: ${errorMessage(error)}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function requestRemoveGame(game) {
+    if (busy || player) return;
+    if (getRemoveConfirmationPreference()) {
+      void removeGameNow(game);
+      return;
+    }
+    setSkipRemoveConfirmation(false);
+    setRemoveGameTarget(game);
+  }
+
+  function confirmRemoveGame() {
+    if (!removeGameTarget) return;
+    if (skipRemoveConfirmation) setRemoveConfirmationPreference(true);
+    void removeGameNow(removeGameTarget);
+  }
+
+  function cancelRemoveGame() {
+    setRemoveGameTarget(null);
   }
 
   async function playFile(url, filename, label, systemOverride = null, external = false, cacheVersion = "", initialSaveState = null, cacheIdOverride = "", knownSize = null) {
@@ -771,6 +853,13 @@ export default function App() {
   return (
     <div className="app-shell">
       <AboutModal open={aboutOpen} onClose={() => setAboutOpen(false)} />
+      <RemoveGameModal
+        game={removeGameTarget}
+        skipConfirmation={skipRemoveConfirmation}
+        onSkipChange={setSkipRemoveConfirmation}
+        onCancel={cancelRemoveGame}
+        onConfirm={confirmRemoveGame}
+      />
       <div className="ambient ambient-one" />
       <div className="ambient ambient-two" />
       <main className="content">
@@ -811,7 +900,7 @@ export default function App() {
               <p className="helper-text">Cached games stay in this browser only. Resume loads the latest local save state when one exists; Play fresh starts from the beginning.</p>
               <div className="recent-list">
                 {recentGames.map((game) => (
-                  <RecentGameCard key={game.cacheId} game={game} onPlay={playRecentGame} disabled={busy || Boolean(player)} />
+                  <RecentGameCard key={game.cacheId} game={game} onPlay={playRecentGame} onRemove={requestRemoveGame} disabled={busy || Boolean(player)} />
                 ))}
               </div>
             </>
