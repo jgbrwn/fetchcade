@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { GamePlayer } from "koin.js";
+import { SYSTEMS as KOIN_SYSTEMS, SUPPORTED_EXTENSIONS as KOIN_SUPPORTED_EXTENSIONS } from "koin.js/systems";
 import "koin.js/styles.css";
 import {
   APP_NAME,
@@ -20,16 +21,21 @@ import {
   systemSupportsFile,
 } from "./archive.mjs";
 import {
+  CACHE_HEADROOM_BYTES,
+  MAX_CACHEABLE_GAME_BYTES,
   cacheStorageAvailable,
   clearResumeState,
   clearRomCache,
   getCachePreference,
   getRecentGames,
   getRomCacheInfo,
+  getStorageEstimate,
   hasResumeState,
+  isCacheableGameSize,
   isRomCached,
   loadResumeState,
   makeRomCacheId,
+  normalizeGameSize,
   pruneRecentGames,
   removeRecentGame,
   saveResumeState,
@@ -81,6 +87,14 @@ async function fetchJson(url) {
   throw lastError || new Error("Archive metadata could not be loaded.");
 }
 
+function responseSize(response) {
+  const range = response.headers.get("Content-Range");
+  const rangeMatch = range?.match(/\/(\d+)$/);
+  if (rangeMatch) return normalizeGameSize(rangeMatch[1]);
+  if (response.status === 206) return null;
+  return normalizeGameSize(response.headers.get("Content-Length"));
+}
+
 async function checkPlayableUrl(url) {
   const response = await fetchWithTimeout(
     url,
@@ -101,7 +115,7 @@ async function checkPlayableUrl(url) {
       // The browser may already have closed the response body.
     }
   }
-  return url;
+  return { url, size: responseSize(response) };
 }
 
 function archiveFetchFailure(lastError, deployed) {
@@ -310,6 +324,94 @@ function SearchResult({ result, onPlay, disabled }) {
   );
 }
 
+function AboutModal({ open, onClose }) {
+  const closeRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    closeRef.current?.focus();
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open, onClose]);
+
+  if (!open) return null;
+  const extensions = [...new Set(KOIN_SUPPORTED_EXTENSIONS)].sort();
+
+  return (
+    <div className="about-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <section className="about-modal" role="dialog" aria-modal="true" aria-labelledby="about-heading" aria-describedby="about-description" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="about-modal-header">
+          <div>
+            <p className="eyebrow">HELP / ABOUT</p>
+            <h2 id="about-heading">How Fetchcade works</h2>
+          </div>
+          <button ref={closeRef} type="button" className="button-secondary about-close" onClick={onClose} aria-label="Close About dialog">×</button>
+        </div>
+        <p className="about-intro" id="about-description">
+          Fetchcade finds a likely playable Internet Archive file and hands it to Koin.js for a browser emulator session. Koin supplies the controls and player UI; Nostalgist.js powers the browser emulation layer.
+        </p>
+
+        <div className="about-help-grid">
+          <section className="about-panel">
+            <h3>Start playing</h3>
+            <ol>
+              <li>Search the Archive or paste an Archive item/file URL.</li>
+              <li>Choose a file and system when the format is ambiguous.</li>
+              <li>Press Koin's Play button, then open its controls/fullscreen affordance on mobile.</li>
+              <li>Use Stop session or Koin's Exit game control to return to Fetchcade.</li>
+            </ol>
+          </section>
+          <section className="about-panel">
+            <h3>Cache &amp; resume</h3>
+            <p>Local caching is off until you opt in. New cached games must be no larger than {formatBytes(MAX_CACHEABLE_GAME_BYTES)}; larger games still play but are not stored locally.</p>
+            <p>Cached games can appear in Recent games and receive browser-local resume saves. Clear local cache removes those copies and resume states from this browser.</p>
+          </section>
+        </div>
+
+        <section className="about-panel about-format-panel">
+          <div className="about-section-heading">
+            <div>
+              <h3>Koin.js systems and file formats</h3>
+              <p className="field-note">Generated from the installed Koin system configuration used by this build.</p>
+            </div>
+            <span className="about-count">{KOIN_SYSTEMS.length} systems</span>
+          </div>
+          <div className="about-systems">
+            {KOIN_SYSTEMS.map((item) => (
+              <article className="about-system" key={item.key}>
+                <div className="about-system-title">
+                  <strong>{item.label}</strong>
+                  <code>{item.key}</code>
+                </div>
+                <p>{item.extensions.join(", ")}</p>
+                {item.biosNeeded && <span className="about-badge">BIOS may be needed</span>}
+              </article>
+            ))}
+          </div>
+          <p className="about-extension-list"><strong>Declared extensions:</strong> {extensions.join(", ")}</p>
+          <p className="field-note about-caveat">A recognized extension does not guarantee that every file will boot. ZIP and 7z files are containers, disc formats may need companion tracks, and some systems require BIOS files. Fetchcade also accepts a few ambiguous raw/disc formats for manual selection. Dreamcast and PSP are not included in this Koin configuration because compatible web cores are unavailable.</p>
+        </section>
+
+        <div className="about-footer">
+          <span>Use only software you are legally authorized to access.</span>
+          <span className="about-links">
+            <a href={KOIN_PROJECT_URL} target="_blank" rel="noreferrer">Koin.js ↗</a>
+            <a href={NOSTALGIST_PROJECT_URL} target="_blank" rel="noreferrer">Nostalgist.js ↗</a>
+          </span>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 export default function App() {
   const [query, setQuery] = useState("");
   const [source, setSource] = useState("");
@@ -328,6 +430,7 @@ export default function App() {
   const [cacheGames, setCacheGames] = useState(() => getCachePreference() && cacheStorageAvailable());
   const [cacheInfo, setCacheInfo] = useState({ available: cacheStorageAvailable(), count: 0, names: [] });
   const [cacheMessage, setCacheMessage] = useState("");
+  const [aboutOpen, setAboutOpen] = useState(false);
   const searchToken = useRef(0);
   const sessionToken = useRef(0);
   const playerRef = useRef(null);
@@ -372,7 +475,7 @@ export default function App() {
     }
   }
 
-  async function playFile(url, filename, label, systemOverride = null, external = false, cacheVersion = "", initialSaveState = null, cacheIdOverride = "") {
+  async function playFile(url, filename, label, systemOverride = null, external = false, cacheVersion = "", initialSaveState = null, cacheIdOverride = "", knownSize = null) {
     const token = ++sessionToken.current;
     setBusy(true);
     setDirectStatus({ message: external ? "Checking the demo…" : "Checking the Archive file…", kind: "" });
@@ -390,26 +493,45 @@ export default function App() {
         throw new Error(`${displayFileName(fileName)} is a ${inferSystem(fileName) || "different"} format, not a ${chosenSystem} game. Choose the matching System.`);
       }
       const cachedReplay = Boolean(cacheIdOverride && await isRomCached(cacheIdOverride));
-      const playableUrl = cachedReplay ? url : await findPlayableUrl(url, parsed);
-      let romId = cacheIdOverride;
+      const playable = cachedReplay ? { url, size: normalizeGameSize(knownSize) } : await findPlayableUrl(url, parsed);
+      const playableSize = normalizeGameSize(knownSize) || playable.size;
+      let romId = cachedReplay ? cacheIdOverride : "";
       if (!romId && !external && cacheGames && cacheStorageAvailable()) {
-        try {
-          romId = await makeRomCacheId({ url, filename: fileName, version: cacheVersion });
-        } catch {
-          setCacheMessage("The local cache key could not be created; this session will still play without caching.");
+        const size = playableSize;
+        let skipReason = null;
+        if (!isCacheableGameSize(size)) {
+          skipReason = size
+            ? `This game is ${formatBytes(size)}; the optional local cache is limited to ${formatBytes(MAX_CACHEABLE_GAME_BYTES)} per game.`
+            : "The file size could not be verified, so this session will play without local caching.";
+        } else {
+          const estimate = await getStorageEstimate();
+          const remaining = estimate ? estimate.quota - estimate.usage : null;
+          if (remaining !== null && remaining < size + CACHE_HEADROOM_BYTES) {
+            skipReason = "The browser does not have enough estimated storage headroom for a local copy, so this session will play without caching.";
+          }
+        }
+        if (skipReason) {
+          setCacheMessage(`${skipReason} You can still play it normally.`);
+        } else {
+          try {
+            romId = await makeRomCacheId({ url, filename: fileName, version: cacheVersion });
+          } catch {
+            setCacheMessage("The local cache key could not be created; this session will still play without caching.");
+          }
         }
       }
       if (token !== sessionToken.current) return;
       const gameTitle = label?.trim() || title.trim() || displayFileName(filename || url).replace(/\.[^.]+$/, "") || "Archive game";
       setPlayer({
-        key: `${playableUrl}-${Date.now()}`,
-        url: playableUrl,
+        key: `${playable.url}-${Date.now()}`,
+        url: playable.url,
         sourceUrl: url,
         filename: fileName,
         title: gameTitle,
         system: chosenSystem,
         cacheId: romId,
         cacheVersion,
+        size: playableSize,
         initialSaveState,
       });
       setDirectStatus({ message: cachedReplay ? "Starting from the local game copy…" : "Launching the player. Use Koin's controls/fullscreen affordance for the best phone layout.", kind: "success" });
@@ -429,6 +551,7 @@ export default function App() {
       title: currentPlayer.title,
       system: currentPlayer.system,
       cacheVersion: currentPlayer.cacheVersion || "",
+      size: currentPlayer.size || null,
       hasResume: await hasResumeState(currentPlayer.cacheId),
     });
     setRecentGames(next);
@@ -470,6 +593,7 @@ export default function App() {
       game.cacheVersion || "",
       initialSaveState,
       game.cacheId,
+      game.size,
     );
   }
 
@@ -507,7 +631,7 @@ export default function App() {
       const itemTitle = metadata.metadata?.title || title;
       setTitle((current) => current.trim() || metadata.metadata?.title || "");
       if (files.length === 1) {
-        await playFile(buildDownloadUrl(parsed.identifier, files[0].name), files[0].name, itemTitle, files[0].system, false, files[0].cacheVersion);
+        await playFile(buildDownloadUrl(parsed.identifier, files[0].name), files[0].name, itemTitle, files[0].system, false, files[0].cacheVersion, null, "", files[0].size);
       } else {
         setDirectStatus({ message: `${files.length} playable-looking files found. Pick one below.`, kind: "success" });
       }
@@ -530,6 +654,9 @@ export default function App() {
         file?.system || null,
         false,
         file?.cacheVersion || "",
+        null,
+        "",
+        file?.size,
       );
     } catch (error) {
       setDirectStatus({ message: errorMessage(error), kind: "error" });
@@ -572,7 +699,7 @@ export default function App() {
     setSource(itemUrl(result.identifier));
     setTitle(result.title);
     if (file.system) setSystem(file.system);
-    await playFile(url, file.name, result.title, file.system || null, false, file.cacheVersion);
+    await playFile(url, file.name, result.title, file.system || null, false, file.cacheVersion, null, "", file.size);
   }
 
   function playDemo() {
@@ -643,6 +770,7 @@ export default function App() {
 
   return (
     <div className="app-shell">
+      <AboutModal open={aboutOpen} onClose={() => setAboutOpen(false)} />
       <div className="ambient ambient-one" />
       <div className="ambient ambient-two" />
       <main className="content">
@@ -650,9 +778,12 @@ export default function App() {
           <a className="brand" href="/" aria-label="Fetchcade home">
             Fetch<span>cade</span>
           </a>
-          <div className="header-note">
-            <span className="live-dot" />
-            <span>Live Archive search</span>
+          <div className="header-actions">
+            <div className="header-note">
+              <span className="live-dot" />
+              <span>Live Archive search</span>
+            </div>
+            <button type="button" className="about-button" onClick={() => setAboutOpen(true)} aria-haspopup="dialog" aria-expanded={aboutOpen}>? / About</button>
           </div>
         </header>
 
@@ -775,7 +906,7 @@ export default function App() {
           <div className="storage-panel" aria-labelledby="cache-heading">
             <div className="storage-copy">
               <p className="storage-title" id="cache-heading">Optional local replay cache</p>
-              <p className="field-note">Keep a browser-local copy of games you play so the next replay can skip the Archive download. Nothing is uploaded to Fetchcade.</p>
+              <p className="field-note">Keep a browser-local copy of games you play so the next replay can skip the Archive download. Nothing is uploaded to Fetchcade. New local copies are limited to {formatBytes(MAX_CACHEABLE_GAME_BYTES)} per game; larger games still play without caching.</p>
               <label className="cache-toggle">
                 <input type="checkbox" checked={cacheGames} onChange={toggleCache} disabled={!cacheInfo.available} />
                 <span>Keep game copies on this device</span>

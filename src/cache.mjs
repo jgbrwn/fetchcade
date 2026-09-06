@@ -4,6 +4,30 @@ export const RESUME_STATE_CACHE_NAME = "fetchcade-resume-state-v1";
 export const RECENT_GAMES_KEY = "fetchcade.recent-games.v1";
 export const MAX_RECENT_GAMES = 20;
 export const CACHE_PREFERENCE_KEY = "fetchcade.cache-roms";
+export const MAX_CACHEABLE_GAME_BYTES = 512 * 1024 * 1024;
+export const CACHE_HEADROOM_BYTES = 64 * 1024 * 1024;
+
+export function normalizeGameSize(value) {
+  const bytes = Number(value);
+  return Number.isFinite(bytes) && bytes > 0 ? bytes : null;
+}
+
+export function isCacheableGameSize(value) {
+  const bytes = normalizeGameSize(value);
+  return bytes !== null && bytes <= MAX_CACHEABLE_GAME_BYTES;
+}
+
+export async function getStorageEstimate() {
+  if (typeof navigator === "undefined" || !navigator.storage?.estimate) return null;
+  try {
+    const estimate = await navigator.storage.estimate();
+    const usage = normalizeGameSize(estimate.usage) || 0;
+    const quota = normalizeGameSize(estimate.quota) || 0;
+    return quota > 0 ? { usage, quota } : null;
+  } catch {
+    return null;
+  }
+}
 
 export function cacheStorageAvailable() {
   return typeof caches !== "undefined" && typeof caches.keys === "function";

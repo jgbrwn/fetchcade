@@ -17,7 +17,7 @@ Fetchcade does **not** upload ROMs, maintain a server-side ROM library, or requi
 - Metadata inspection so search results are limited to items with likely playable files.
 - [Koin.js](https://github.com/muditjuneja/koin) controls and emulator UI, including touch controls, keyboard/gamepad input, rewind, and save-state controls where the selected core supports them; [Nostalgist.js](https://github.com/arianrhodsandlot/nostalgist) provides the underlying browser emulation runtime.
 - An Archive-only Cloudflare Worker relay for download redirects that do not expose browser CORS headers.
-- Optional, opt-in browser-local ROM caching for faster replay. It is off by default and can be cleared from the UI.
+- Optional, opt-in browser-local ROM caching for faster replay. It is off by default, new copies are limited to 512 MiB per game, and it can be cleared from the UI.
 - A local **Recent games** list of up to 20 cached games. **Play** starts from the beginning; **Resume** loads the latest local save state when one exists.
 - Cross-origin isolation and security headers needed by the emulator cores.
 
@@ -43,7 +43,7 @@ Koin supplies the touch-control UI. On a phone, open Koin's controls/fullscreen 
 There are two separate storage concepts:
 
 1. **Session memory:** Koin/Nostalgist downloads the selected file into browser memory while the emulator is running. Choosing **Stop session** unmounts the player; Koin's cleanup path stops the emulator and releases its temporary emulator resources.
-2. **Optional local replay cache:** When enabled, Koin stores a copy in this browser's Cache Storage under the Koin ROM cache. This is persistent client-side storage, not server-side storage. It is disabled by default. The **Clear local cache** button removes those local copies; it does not delete anything from Internet Archive or Fetchcade servers.
+2. **Optional local replay cache:** When enabled, Koin stores a copy in this browser's Cache Storage under the Koin ROM cache. This is persistent client-side storage, not server-side storage. It is disabled by default. New local copies are capped at 512 MiB per game and require estimated browser storage headroom; larger games still play without caching. The **Clear local cache** button removes those local copies; it does not delete anything from Internet Archive or Fetchcade servers.
 
 Closing a session does not delete an intentionally enabled local cache. Stop the session before clearing it.
 
