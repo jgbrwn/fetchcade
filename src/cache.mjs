@@ -99,6 +99,12 @@ export function updateRecentGame(cacheId, updates) {
   return next;
 }
 
+export function removeRecentGame(cacheId) {
+  const next = getRecentGames().filter((game) => game.cacheId !== cacheId);
+  persistRecentGames(next);
+  return next;
+}
+
 function resumeStateKey(cacheId) {
   const key = new URL(cacheId);
   key.pathname = `${key.pathname.replace(/\/$/, "")}/resume-state`;
@@ -118,6 +124,12 @@ export async function loadResumeState(cacheId) {
   const cache = await caches.open(RESUME_STATE_CACHE_NAME);
   const response = await cache.match(resumeStateKey(cacheId));
   return response ? response.blob() : null;
+}
+
+export async function clearResumeState(cacheId) {
+  if (!cacheStorageAvailable() || !cacheId) return false;
+  const cache = await caches.open(RESUME_STATE_CACHE_NAME);
+  return cache.delete(resumeStateKey(cacheId));
 }
 
 export async function hasResumeState(cacheId) {

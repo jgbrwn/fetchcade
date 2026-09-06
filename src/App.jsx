@@ -12,13 +12,16 @@ import {
   displayFileName,
   formatBytes,
   inferSystem,
+  isSupportedFileName,
   itemUrl,
   parseArchiveUrl,
   playableFiles,
   systemLabels,
+  systemSupportsFile,
 } from "./archive.mjs";
 import {
   cacheStorageAvailable,
+  clearResumeState,
   clearRomCache,
   getCachePreference,
   getRecentGames,
@@ -28,6 +31,7 @@ import {
   loadResumeState,
   makeRomCacheId,
   pruneRecentGames,
+  removeRecentGame,
   saveResumeState,
   setCachePreference,
   updateRecentGame,
@@ -98,6 +102,16 @@ async function checkPlayableUrl(url) {
   return url;
 }
 
+function archiveFetchFailure(lastError, deployed) {
+  const message = errorMessage(lastError || "unknown error");
+  if (/HTTP 404/.test(message)) return "Archive could not find that file (HTTP 404). Check the item and filename.";
+  if (/HTTP 401|HTTP 403/.test(message)) return "Archive denied access to that file. The item may be private, restricted, or unavailable.";
+  if (/timed out/i.test(message)) return "Archive took too long to answer. Try again or choose another file.";
+  return deployed
+    ? `The browser could not fetch this Archive file through its direct URL or relay (${message}).`
+    : "The browser could not fetch this Archive file. Try again from the deployed app so its CORS relay can help.";
+}
+
 async function findPlayableUrl(directUrl, parsed) {
   const candidates = [];
   if (parsed?.kind === "file") candidates.push(buildCorsUrl(parsed.identifier, parsed.filename));
@@ -114,10 +128,7 @@ async function findPlayableUrl(directUrl, parsed) {
     }
   }
 
-  if (RELAY_ENABLED) {
-    throw new Error(`Archive file fetch failed after trying the direct URL and relay (${errorMessage(lastError)}).`);
-  }
-  throw new Error("Archive file fetch failed. Try again from the deployed app so its CORS relay can help.");
+  throw new Error(archiveFetchFailure(lastError, RELAY_ENABLED));
 }
 
 async function inspectSearchDocuments(documents, isCurrent) {
@@ -365,16 +376,23 @@ export default function App() {
     setDirectStatus({ message: external ? "Checking the demo…" : "Checking the Archive file…", kind: "" });
     try {
       const parsed = external ? null : parseArchiveUrl(url);
+      const fileName = filename || displayFileName(url);
+      if (!external && !isSupportedFileName(fileName)) {
+        throw new Error(`This Archive file (${displayFileName(fileName)}) is not a recognized Koin game format.`);
+      }
+      const chosenSystem = systemOverride || (system === "auto" ? inferSystem(fileName) : system);
+      if (!chosenSystem || chosenSystem === "auto") {
+        throw new Error(`Fetchcade could not identify a console for ${displayFileName(fileName)}. Choose a supported System manually.`);
+      }
+      if (!external && !systemSupportsFile(chosenSystem, fileName)) {
+        throw new Error(`${displayFileName(fileName)} is a ${inferSystem(fileName) || "different"} format, not a ${chosenSystem} game. Choose the matching System.`);
+      }
       const cachedReplay = Boolean(cacheIdOverride && await isRomCached(cacheIdOverride));
       const playableUrl = cachedReplay ? url : await findPlayableUrl(url, parsed);
-      const chosenSystem = systemOverride || (system === "auto" ? inferSystem(filename || url) : system);
-      if (!chosenSystem) {
-        throw new Error("This file type does not identify a console. Choose a System manually, then play it.");
-      }
       let romId = cacheIdOverride;
       if (!romId && !external && cacheGames && cacheStorageAvailable()) {
         try {
-          romId = await makeRomCacheId({ url, filename: filename || displayFileName(url), version: cacheVersion });
+          romId = await makeRomCacheId({ url, filename: fileName, version: cacheVersion });
         } catch {
           setCacheMessage("The local cache key could not be created; this session will still play without caching.");
         }
@@ -385,7 +403,7 @@ export default function App() {
         key: `${playableUrl}-${Date.now()}`,
         url: playableUrl,
         sourceUrl: url,
-        filename: filename || displayFileName(url),
+        filename: fileName,
         title: gameTitle,
         system: chosenSystem,
         cacheId: romId,
@@ -560,6 +578,25 @@ export default function App() {
     setTitle("NES Diamond-Chase (MIT demo)");
     setDirectStatus({ message: "Loading the MIT-licensed homebrew demo…", kind: "" });
     playFile(DEMO_URL, "game.nes", "NES Diamond-Chase (MIT demo)", "NES", true).catch(() => {});
+  }
+
+  async function handlePlayerError(error) {
+    const failedPlayer = player;
+    sessionToken.current += 1;
+    setPlayer(null);
+    if (failedPlayer?.cacheId) {
+      try {
+        await clearResumeState(failedPlayer.cacheId);
+      } catch {
+        // Resume cleanup is best-effort; the explicit cache clear control remains available.
+      }
+      setRecentGames(removeRecentGame(failedPlayer.cacheId));
+    }
+    await refreshCacheInfo();
+    setDirectStatus({
+      message: `Could not play ${failedPlayer?.title ? `“${failedPlayer.title}”` : "that file"}: ${errorMessage(error)}. The player was closed and you are back at the menu.`,
+      kind: "error",
+    });
   }
 
   function closePlayer() {
@@ -739,7 +776,7 @@ export default function App() {
               <button className="button-secondary close-button" type="button" onClick={closePlayer}>Stop session</button>
             </div>
             <div className="player-mount">
-              <PlayerErrorBoundary onError={(error) => setDirectStatus({ message: `Koin could not start this game: ${errorMessage(error)}`, kind: "error" })}>
+              <PlayerErrorBoundary onError={handlePlayerError}>
                 <GamePlayer
                   key={player.key}
                   romId={player.cacheId || ""}
@@ -756,7 +793,7 @@ export default function App() {
                     setDirectStatus({ message: "Ready. On a phone, open Koin's controls/fullscreen affordance and rotate landscape if helpful.", kind: "success" });
                     recordRecentGame(player);
                   }}
-                  onError={(error) => setDirectStatus({ message: `Koin could not load this file: ${errorMessage(error)}`, kind: "error" })}
+                  onError={handlePlayerError}
                   onExit={closePlayer}
                 />
               </PlayerErrorBoundary>

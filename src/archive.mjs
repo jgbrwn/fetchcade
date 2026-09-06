@@ -164,6 +164,28 @@ export function inferSystem(name) {
   return null;
 }
 
+export function isSupportedFileName(name) {
+  return ROM_EXTENSIONS.test(normalizedName(name));
+}
+
+const DEFINITIVE_SYSTEMS_BY_EXTENSION = new Map([
+  [".nes", ["NES"]], [".fds", ["NES"]],
+  [".snes", ["SNES"]], [".smc", ["SNES"]], [".sfc", ["SNES"]], [".fig", ["SNES"]], [".swc", ["SNES"]],
+  [".n64", ["N64"]], [".z64", ["N64"]], [".v64", ["N64"]],
+  [".gb", ["GB"]], [".gbc", ["GBC"]], [".gba", ["GBA"]], [".nds", ["NDS"]], [".vb", ["VIRTUAL_BOY"]],
+  [".gen", ["GENESIS"]], [".md", ["GENESIS"]], [".smd", ["GENESIS"]], [".sms", ["MASTER_SYSTEM"]], [".gg", ["GAME_GEAR"]],
+  [".pbp", ["PS1"]], [".pce", ["PC_ENGINE"]], [".neo", ["NEOGEO"]], [".ngp", ["NEOGEO_POCKET"]], [".ngc", ["NEOGEO_POCKET_COLOR"]],
+  [".lnx", ["LYNX"]], [".lyx", ["LYNX"]], [".a52", ["ATARI_5200"]], [".a26", ["ATARI_2600"]], [".a78", ["ATARI_7800"]],
+  [".ws", ["WONDERSWAN"]], [".wsc", ["WONDERSWAN_COLOR"],],
+  [".d64", ["C64"]], [".t64", ["C64"]], [".tap", ["C64"]], [".prg", ["C64"]], [".crt", ["C64"]],
+]);
+
+export function systemSupportsFile(system, name) {
+  const extension = normalizedName(name).match(/\.[a-z0-9]+$/)?.[0];
+  const expected = extension ? DEFINITIVE_SYSTEMS_BY_EXTENSION.get(extension) : null;
+  return !expected || expected.includes(system);
+}
+
 export function formatHint(name) {
   const value = normalizedName(name);
   if (value.endsWith(".zip")) return "ZIP container · choose system";
@@ -178,7 +200,7 @@ export function isLikelyPlayableFile(file) {
   return Boolean(
     file &&
       typeof file.name === "string" &&
-      ROM_EXTENSIONS.test(file.name) &&
+      isSupportedFileName(file.name) &&
       file.private !== "true" &&
       file.private !== true &&
       file.source !== "metadata" &&

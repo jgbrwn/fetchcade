@@ -4,8 +4,10 @@ import {
   buildDownloadUrl,
   buildSearchUrl,
   inferSystem,
+  isSupportedFileName,
   parseArchiveUrl,
   playableFiles,
+  systemSupportsFile,
 } from "../src/archive.mjs";
 
 test("parses an Archive item URL", () => {
@@ -51,6 +53,14 @@ test("infers the expanded console set and leaves ambiguous containers manual", (
   assert.equal(inferSystem("arcade-set.zip"), "ARCADE");
   assert.equal(inferSystem("game.zip"), null);
   assert.equal(inferSystem("game.cue"), null);
+});
+
+test("recognizes supported files and rejects obvious system mismatches", () => {
+  assert.equal(isSupportedFileName("game.nes"), true);
+  assert.equal(isSupportedFileName("readme.txt"), false);
+  assert.equal(systemSupportsFile("NES", "game.nes"), true);
+  assert.equal(systemSupportsFile("PS1", "game.nes"), false);
+  assert.equal(systemSupportsFile("PS1", "game.cue"), true);
 });
 
 test("filters private and non-ROM metadata files", () => {

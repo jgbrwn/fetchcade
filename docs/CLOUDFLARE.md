@@ -33,41 +33,35 @@ npm run deploy
 
 Wrangler will report the resulting `workers.dev` hostname.
 
-### For the connection screen in the screenshot
-
-Change the defaults to:
-
-- **Build command:** `npm run build && npm run generate-wrangler-config`
-- **Deploy command:** `npx wrangler deploy --config .wrangler.generated.json`
-
-In **Advanced settings**, add these Cloudflare **build-time** variables:
-
-- `FETCHCADE_WORKER_NAME` = the existing Worker name chosen in Cloudflare.
-- `FETCHCADE_CUSTOM_DOMAIN` = the existing production hostname, if any.
-
-These values are intentionally stored in the Cloudflare build configuration instead of Git. The Worker runtime Variables/Secrets panel is a different environment: runtime variables are not a reliable source for the build/deploy shell. Fetchcade currently does not require any application runtime secret, R2 binding, D1 binding, or API token during a native Cloudflare Workers Builds deployment; Cloudflare's connected build integration supplies the deployment authentication.
-
-If **Enable Preview builds** is selected, give preview builds a separate Worker name and leave `FETCHCADE_CUSTOM_DOMAIN` empty for previews. Do not let a preview deployment try to claim the production custom domain. The simplest first setup is to leave Preview builds off, confirm production deploys, and add a separate preview Worker later.
-
 ## Cloudflare Workers Builds / Git deploys
 
 To deploy automatically after pushes to `main`:
 
 1. Push this repository to GitHub.
 2. In the Cloudflare dashboard, open **Workers & Pages**, create/import a Worker from the repository, and connect the GitHub account.
-3. Set the production branch to `main`.
-4. Use `/` as the project root.
-5. If the dashboard has separate commands, use:
-   - **Build command:** `npm run build && npm run generate-wrangler-config`
-   - **Deploy command:** `npx wrangler deploy --config .wrangler.generated.json`
-6. If it offers one command, use `npm run deploy`.
-7. Add these build environment variables in Cloudflare—not in Git:
-   - `FETCHCADE_WORKER_NAME` — the Worker name already chosen in Cloudflare.
-   - `FETCHCADE_CUSTOM_DOMAIN` — optional hostname to attach as a custom domain.
-   - `CLOUDFLARE_ACCOUNT_ID` — only if the connected build environment asks for it.
-8. Use the Cloudflare-managed Git/Workers authentication where available. If a token is required, add it as a masked build secret named `CLOUDFLARE_API_TOKEN`.
+3. Set the production branch to `main` and use `/` as the project root.
+4. Set the build command to:
 
-The generated config is ignored by `.gitignore`, so public GitHub builds do not need to expose the deployment values. A pull request or push can build the app without having access to the production secret; only the Cloudflare deploy step needs the account credentials.
+   ```text
+   npm run build && npm run generate-wrangler-config
+   ```
+
+5. Set the deploy command to:
+
+   ```text
+   npx wrangler deploy --config .wrangler.generated.json
+   ```
+
+6. In Advanced settings, add these Cloudflare **build-time** variables—not Git-tracked values:
+   - `FETCHCADE_WORKER_NAME` — the existing Worker name chosen in Cloudflare.
+   - `FETCHCADE_CUSTOM_DOMAIN` — the production hostname, if any.
+7. Cloudflare's connected Git/Workers integration supplies deployment authentication. Do not add `CLOUDFLARE_API_TOKEN` unless the integration explicitly requires it. The Worker runtime Variables/Secrets panel is a different environment and is not a reliable source for the build shell.
+
+Fetchcade currently requires no application runtime secret, R2 binding, D1 binding, or API token for a native Workers Builds deployment. The generated config is ignored by `.gitignore`, keeping deployment values out of the public repository.
+
+If **Enable Preview builds** is selected, give preview builds a separate Worker name and leave `FETCHCADE_CUSTOM_DOMAIN` empty for previews. Do not let a preview deployment try to claim the production custom domain. The simplest first setup is to leave Preview builds off, confirm production deploys, and add a separate preview Worker later.
+
+The simpler `npm run build` / `npx wrangler deploy` defaults may work with Cloudflare's CI name override, but they do not generate the private custom-domain config and can produce a Wrangler name-mismatch warning. Use the explicit commands above.
 
 ## Post-deploy checks
 
