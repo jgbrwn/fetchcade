@@ -4,6 +4,8 @@ import path from "node:path";
 const packageRoot = path.resolve("node_modules/koin.js/dist");
 const files = ["index.mjs", "index.js"];
 const telemetryReplacement = `// Fetchcade deliberately disables Koin's optional telemetry.\nvar sendTelemetry = () => {};`;
+const canvasCleanupMarker = "Fetchcade removes Koin's emulator canvas during session cleanup.";
+const fullscreenExitMarker = "Fetchcade routes Koin's mobile fullscreen Exit button to Fetchcade session cleanup.";
 const telemetryPattern = /\/\/ src\/lib\/telemetry\.ts\nvar sendTelemetry = \(eventName, params = \{\}\) => \{[\s\S]*?\n\};\n\n\/\/ src\/locales\/es\.ts/;
 
 function replaceOnce(source, oldText, newText, file, label) {
@@ -76,6 +78,51 @@ for (const file of files) {
       "Koin stop abort",
     );
     console.log(`Patched Koin preparation cleanup in ${file}`);
+  }
+
+  if (!source.includes(canvasCleanupMarker)) {
+    const canvasExitOccurrences = source.split("removeCanvas: false").length - 1;
+    if (canvasExitOccurrences !== 2) {
+      throw new Error(`Expected two Koin canvas cleanup calls in ${file}; found ${canvasExitOccurrences}`);
+    }
+    source = source.replaceAll("removeCanvas: false", "removeCanvas: true");
+    const hookPrefix = file === "index.js" ? "React2." : "";
+    source = replaceOnce(
+      source,
+      `  const stop = ${hookPrefix}useCallback(() => {\n    prepareAbortRef.current?.abort();`,
+      `  // ${canvasCleanupMarker}\n  const stop = ${hookPrefix}useCallback(() => {\n    prepareAbortRef.current?.abort();`,
+      file,
+      "Koin canvas cleanup marker",
+    );
+    console.log(`Patched Koin canvas removal in ${file}`);
+  }
+
+  if (!source.includes(fullscreenExitMarker)) {
+    const jsxPrefix = file === "index.js" ? "jsxRuntime.jsx" : "jsx";
+    source = replaceOnce(
+      source,
+      `          isFullscreen2 && isMobile && /* @__PURE__ */ ${jsxPrefix}(\n            FloatingExitButton,\n            {\n              onClick: handleFullscreen,`,
+      `          isFullscreen2 && isMobile && /* @__PURE__ */ ${jsxPrefix}(\n            FloatingExitButton,\n            {\n              // ${fullscreenExitMarker}\n              onClick: handleExitClick,`,
+      file,
+      "Koin mobile fullscreen exit handler",
+    );
+
+    const floatingStart = source.indexOf("function FloatingExitButton");
+    const floatingEnd = source.indexOf("function FloatingFullscreenButton", floatingStart);
+    if (floatingStart < 0 || floatingEnd < 0) {
+      throw new Error(`Koin floating exit button changed; refusing an unreviewed patch in ${file}`);
+    }
+    let floatingButton = source.slice(floatingStart, floatingEnd);
+    if ((floatingButton.match(/"aria-label": "Exit fullscreen"/g) || []).length !== 1) {
+      throw new Error(`Expected one floating exit aria label in ${file}`);
+    }
+    floatingButton = floatingButton.replace('"aria-label": "Exit fullscreen"', '"aria-label": "Exit game"');
+    if ((floatingButton.match(/children: "Exit"/g) || []).length !== 1) {
+      throw new Error(`Expected one floating exit label in ${file}`);
+    }
+    floatingButton = floatingButton.replace('children: "Exit"', 'children: "Exit game"');
+    source = `${source.slice(0, floatingStart)}${floatingButton}${source.slice(floatingEnd)}`;
+    console.log(`Patched Koin mobile fullscreen exit in ${file}`);
   }
 
   fs.writeFileSync(target, source);

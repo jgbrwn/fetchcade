@@ -329,7 +329,6 @@ export default function App() {
   const searchToken = useRef(0);
   const sessionToken = useRef(0);
   const playerRef = useRef(null);
-  const playerMountRef = useRef(null);
 
   useEffect(() => {
     document.title = `${APP_NAME} — Fetch. Play. No server shelf.`;
@@ -583,16 +582,37 @@ export default function App() {
 
   function unmountPlayerAndReturnHome() {
     sessionToken.current += 1;
-    const mount = playerMountRef.current;
-    const exitFullscreen = document.exitFullscreen || document.webkitExitFullscreen;
-    if (document.fullscreenElement && exitFullscreen) {
-      Promise.resolve(exitFullscreen.call(document)).catch(() => {});
+    const fullscreenElement = document.fullscreenElement
+      || document.webkitFullscreenElement
+      || document.mozFullScreenElement
+      || document.msFullscreenElement;
+    const exitFullscreen = document.exitFullscreen
+      || document.webkitExitFullscreen
+      || document.mozCancelFullScreen
+      || document.msExitFullscreen;
+    let finished = false;
+    let fallbackTimer;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      if (fallbackTimer) window.clearTimeout(fallbackTimer);
+      setPlayer(null);
+      requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "auto" }));
+    };
+
+    if (!fullscreenElement || !exitFullscreen) {
+      finish();
+      return;
     }
-    setPlayer(null);
-    requestAnimationFrame(() => {
-      mount?.replaceChildren();
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    });
+
+    // Let Android Chrome leave fullscreen before React removes the fullscreen element.
+    // The timeout prevents a browser-specific fullscreen promise from trapping the page.
+    fallbackTimer = window.setTimeout(finish, 350);
+    try {
+      Promise.resolve(exitFullscreen.call(document)).then(finish, finish);
+    } catch {
+      finish();
+    }
   }
 
   async function handlePlayerError(error) {
@@ -788,7 +808,7 @@ export default function App() {
               </div>
               <button className="button-secondary close-button" type="button" onClick={closePlayer}>Stop session</button>
             </div>
-            <div className="player-mount" ref={playerMountRef}>
+            <div className="player-mount">
               <PlayerErrorBoundary onError={handlePlayerError}>
                 <GamePlayer
                   key={player.key}
