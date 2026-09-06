@@ -329,6 +329,7 @@ export default function App() {
   const searchToken = useRef(0);
   const sessionToken = useRef(0);
   const playerRef = useRef(null);
+  const playerMountRef = useRef(null);
 
   useEffect(() => {
     document.title = `${APP_NAME} — Fetch. Play. No server shelf.`;
@@ -580,10 +581,23 @@ export default function App() {
     playFile(DEMO_URL, "game.nes", "NES Diamond-Chase (MIT demo)", "NES", true).catch(() => {});
   }
 
+  function unmountPlayerAndReturnHome() {
+    sessionToken.current += 1;
+    const mount = playerMountRef.current;
+    const exitFullscreen = document.exitFullscreen || document.webkitExitFullscreen;
+    if (document.fullscreenElement && exitFullscreen) {
+      Promise.resolve(exitFullscreen.call(document)).catch(() => {});
+    }
+    setPlayer(null);
+    requestAnimationFrame(() => {
+      mount?.replaceChildren();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  }
+
   async function handlePlayerError(error) {
     const failedPlayer = player;
-    sessionToken.current += 1;
-    setPlayer(null);
+    unmountPlayerAndReturnHome();
     if (failedPlayer?.cacheId) {
       try {
         await clearResumeState(failedPlayer.cacheId);
@@ -600,8 +614,7 @@ export default function App() {
   }
 
   function closePlayer() {
-    sessionToken.current += 1;
-    setPlayer(null);
+    unmountPlayerAndReturnHome();
     setDirectStatus({ message: "Session stopped. Koin is unmounted so its emulator resources can be released.", kind: "" });
     refreshCacheInfo();
   }
@@ -775,7 +788,7 @@ export default function App() {
               </div>
               <button className="button-secondary close-button" type="button" onClick={closePlayer}>Stop session</button>
             </div>
-            <div className="player-mount">
+            <div className="player-mount" ref={playerMountRef}>
               <PlayerErrorBoundary onError={handlePlayerError}>
                 <GamePlayer
                   key={player.key}
