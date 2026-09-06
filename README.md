@@ -7,7 +7,7 @@
 
 **Fetch. Play. No server shelf.**
 
-Fetchcade is a browser-first retro-game launcher. Search Internet Archive, choose an item with a likely playable file, and hand that file to [Koin.js](https://github.com/muditjuneja/koin) for a browser session.
+Fetchcade is a browser-first retro-game launcher. Search Internet Archive, choose an item with a likely playable file, and hand that file to [Koin.js](https://github.com/muditjuneja/koin), with [Nostalgist.js](https://github.com/arianrhodsandlot/nostalgist) powering the browser emulation layer.
 
 Fetchcade does **not** upload ROMs, maintain a server-side ROM library, or require an account.
 
@@ -15,7 +15,7 @@ Fetchcade does **not** upload ROMs, maintain a server-side ROM library, or requi
 
 - Live Internet Archive search plus direct item/file URL support.
 - Metadata inspection so search results are limited to items with likely playable files.
-- Koin.js controls and emulator UI, including touch controls, keyboard/gamepad input, rewind, and save-state controls where the selected core supports them.
+- [Koin.js](https://github.com/muditjuneja/koin) controls and emulator UI, including touch controls, keyboard/gamepad input, rewind, and save-state controls where the selected core supports them; [Nostalgist.js](https://github.com/arianrhodsandlot/nostalgist) provides the underlying browser emulation runtime.
 - An Archive-only Cloudflare Worker relay for download redirects that do not expose browser CORS headers.
 - Optional, opt-in browser-local ROM caching for faster replay. It is off by default and can be cleared from the UI.
 - A local **Recent games** list of up to 20 cached games. **Play** starts from the beginning; **Resume** loads the latest local save state when one exists.

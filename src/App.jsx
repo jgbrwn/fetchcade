@@ -42,6 +42,8 @@ const SEARCH_ROWS = 20;
 const INSPECT_LIMIT = 12;
 const FILE_DISPLAY_LIMIT = 60;
 const RELAY_ENABLED = import.meta.env.PROD;
+const KOIN_PROJECT_URL = "https://github.com/muditjuneja/koin";
+const NOSTALGIST_PROJECT_URL = "https://github.com/arianrhodsandlot/nostalgist";
 
 function relayUrl(target) {
   return RELAY_ENABLED ? `/fetch?url=${encodeURIComponent(target)}` : null;
@@ -658,7 +660,7 @@ export default function App() {
           <div className="hero-kicker">A temporary arcade for the open web</div>
           <h1>Fetch a game.<br /><em>Play it now.</em></h1>
           <p className="hero-copy">
-            Search Internet Archive or bring a known link. Fetchcade sends the game to your browser—no server-side ROM shelf, with an optional local replay shelf you control.
+            Search Internet Archive or bring a known link. Fetchcade sends the game to your browser—no server-side ROM shelf; optional replay caching stays under your control. <a href={KOIN_PROJECT_URL} target="_blank" rel="noreferrer">Koin.js</a> provides the player and touch controls, while <a href={NOSTALGIST_PROJECT_URL} target="_blank" rel="noreferrer">Nostalgist.js</a> powers the browser emulation layer.
           </p>
           <div className="hero-chips" aria-label="Product features">
             <span>Archive powered</span><span>Touch ready</span><span>No server-side library</span>
@@ -857,6 +859,10 @@ export default function App() {
             <span>Use only software you are legally authorized to access.</span>
           </div>
           <div className="footer-right">
+            <span>Gameplay powered by</span>
+            <a href={KOIN_PROJECT_URL} target="_blank" rel="noreferrer">Koin.js ↗</a>
+            <span>and</span>
+            <a href={NOSTALGIST_PROJECT_URL} target="_blank" rel="noreferrer">Nostalgist.js ↗</a>
             <a href="https://github.com/jgbrwn/fetchcade" target="_blank" rel="noreferrer">GitHub project ↗</a>
             <span>Fetchcade does not verify rights or encourage illegal ROM use.</span>
           </div>
