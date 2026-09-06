@@ -1,0 +1,10 @@
+/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
+  Cross-Origin-Resource-Policy: same-origin
+  Cache-Control: no-store
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  X-Frame-Options: DENY
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
+  Content-Security-Policy: default-src 'self'; script-src 'self' blob: https://cdn.jsdelivr.net 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://archive.org https://*.archive.org https://raw.githubusercontent.com https://cdn.jsdelivr.net; img-src 'self' data: blob: https://archive.org https://*.archive.org; media-src 'self' blob:; worker-src 'self' blob: data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'

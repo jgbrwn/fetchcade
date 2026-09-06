@@ -1,0 +1,22 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "fetchcade",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-09-06",
+  "workers_dev": true,
+  "routes": [
+    {
+      "pattern": "fetchcade.techpique.com",
+      "custom_domain": true
+    }
+  ],
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": [
+      "/fetch",
+      "/health"
+    ],
+    "not_found_handling": "single-page-application"
+  }
+}

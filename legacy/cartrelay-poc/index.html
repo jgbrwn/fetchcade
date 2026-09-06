@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#0a0b10">
+  <title>CartRelay — Pick. Fetch. Play.</title>
+  <style>
+    :root {
+      --bg:#0a0b10; --panel:#141621; --panel2:#1b1e2b; --text:#f2f4f8;
+      --muted:#9aa2b2; --accent:#74f0c2; --accent2:#a889ff; --danger:#ff7a90;
+      --border:#2a2e3c;
+    }
+    * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+    html, body { margin:0; min-height:100%; background:var(--bg); color:var(--text); font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+    body { overscroll-behavior:none; }
+    button, input, select { font:inherit; }
+    .shell { max-width:840px; margin:auto; padding:18px 14px calc(28px + env(safe-area-inset-bottom)); }
+    header { display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin:10px 2px 20px; }
+    .brand { font-size:clamp(28px,8vw,52px); font-weight:900; letter-spacing:-.06em; line-height:.9; }
+    .brand span { color:var(--accent); }
+    .tag { color:var(--muted); font-size:12px; text-align:right; max-width:260px; }
+    .card { background:linear-gradient(180deg,var(--panel),#10121a); border:1px solid var(--border); border-radius:18px; padding:16px; margin:12px 0; box-shadow:0 18px 60px rgba(0,0,0,.24); }
+    h2 { margin:0 0 12px; font-size:16px; letter-spacing:.02em; }
+    label { display:block; margin:12px 0 6px; color:var(--muted); font-size:12px; }
+    input, select {
+      width:100%; min-height:48px; border-radius:12px; border:1px solid var(--border);
+      background:var(--panel2); color:var(--text); padding:11px 12px; outline:none;
+    }
+    input:focus, select:focus { border-color:var(--accent); }
+    .row { display:grid; grid-template-columns:1fr 180px; gap:10px; }
+    .buttons { display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; }
+    button {
+      border:0; min-height:48px; border-radius:12px; padding:11px 15px; cursor:pointer;
+      background:var(--accent); color:#07110d; font-weight:900; touch-action:manipulation;
+    }
+    button.secondary { background:var(--panel2); color:var(--text); border:1px solid var(--border); }
+    button:disabled { opacity:.45; cursor:default; }
+    .status { min-height:22px; margin-top:12px; color:var(--muted); font-size:12px; line-height:1.5; }
+    .status.ok { color:var(--accent); }
+    .status.err { color:var(--danger); }
+    .small { color:var(--muted); font-size:11px; line-height:1.55; }
+    details { margin-top:12px; }
+    summary { cursor:pointer; color:var(--muted); font-size:12px; }
+    .player-wrap { display:none; margin-top:14px; }
+    .player-wrap.active { display:block; }
+    .player-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; }
+    #playerMount { width:100%; min-height:420px; border-radius:16px; overflow:hidden; background:#000; touch-action:none; }
+    retro-game-player { display:block; width:100%; min-height:420px; }
+    .file-picker { display:none; margin-top:12px; }
+    .file-picker.active { display:block; }
+    .badge { display:inline-block; border:1px solid var(--border); border-radius:999px; padding:5px 8px; color:var(--muted); font-size:10px; }
+    code { color:#d7cdfd; overflow-wrap:anywhere; }
+    @media(max-width:620px) {
+      .row { grid-template-columns:1fr; }
+      header { align-items:flex-start; flex-direction:column; }
+      .tag { text-align:left; }
+      .shell { padding-left:10px; padding-right:10px; }
+      .card { border-radius:14px; padding:13px; }
+      #playerMount, retro-game-player { min-height:520px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div class="brand">Cart<span>Relay</span></div>
+      <div class="tag">Pick. Fetch. Play.<br>No ROM library required.</div>
+    </header>
+
+    <section class="card">
+      <h2>Play from Internet Archive</h2>
+      <p class="small">
+        Paste an Archive item page or a direct Archive file URL. CartRelay stores only the pointer;
+        the game is fetched for this play session. Use only software you have the right to access.
+      </p>
+
+      <label for="source">Archive URL</label>
+      <input id="source" autocomplete="off" autocapitalize="off" spellcheck="false"
+        placeholder="https://archive.org/details/item-id  or  https://archive.org/download/item-id/game.nes">
+
+      <div class="row">
+        <div>
+          <label for="system">System</label>
+          <select id="system">
+            <option value="auto">Auto from extension</option>
+            <option value="nes">NES / Famicom</option>
+            <option value="snes">SNES / Super Famicom</option>
+            <option value="genesis">Sega Genesis / Mega Drive</option>
+            <option value="master_system">Master System</option>
+            <option value="game_gear">Game Gear</option>
+            <option value="gb">Game Boy</option>
+            <option value="gbc">Game Boy Color</option>
+            <option value="gba">Game Boy Advance</option>
+          </select>
+        </div>
+        <div>
+          <label for="title">Display title</label>
+          <input id="title" placeholder="Optional">
+        </div>
+      </div>
+
+      <div id="filePicker" class="file-picker">
+        <label for="files">ROM-like files found in this Archive item</label>
+        <select id="files"></select>
+      </div>
+
+      <div class="buttons">
+        <button id="resolveBtn">Resolve & Play</button>
+        <button id="playPickedBtn" class="secondary" style="display:none">Play selected file</button>
+        <button id="demoBtn" class="secondary">Test with MIT NES homebrew</button>
+      </div>
+
+      <div id="status" class="status"></div>
+
+      <details>
+        <summary>Optional Archive CORS relay</summary>
+        <p class="small">
+          Some Archive downloads redirect to storage nodes that omit browser CORS headers.
+          Deploy the included <code>archive-relay-worker.js</code>, then paste its base URL here.
+          It follows Archive redirects and streams bytes back with <code>Cache-Control: no-store</code>.
+          It does not save ROMs.
+        </p>
+        <label for="proxyBase">Relay Worker URL</label>
+        <input id="proxyBase" autocomplete="off" autocapitalize="off" spellcheck="false"
+          placeholder="https://your-cartrelay-worker.workers.dev">
+      </details>
+    </section>
+
+    <section class="card player-wrap" id="playerWrap">
+      <div class="player-head">
+        <div>
+          <strong id="nowPlaying">Now playing</strong><br>
+          <span class="badge" id="sourceBadge">remote</span>
+        </div>
+        <button class="secondary" id="closeBtn">Close</button>
+      </div>
+      <div id="playerMount"></div>
+    </section>
+
+    <section class="card">
+      <h2>What this POC proves</h2>
+      <div class="small">
+        • Koin.js supplies the mobile virtual D-pad/buttons and emulator cores.<br>
+        • Archive item pages can be resolved through the public metadata API.<br>
+        • ROM bytes are fetched only when a game is launched; this app has no ROM database or upload flow.<br>
+        • The included relay is a no-storage workaround for inconsistent Archive CORS redirects.<br>
+        • HTTP/browser caches are outside CartRelay's control in direct mode; the relay explicitly returns <code>no-store</code>.
+      </div>
+    </section>
+  </main>
+
+  <!-- Official Koin.js README documents this web-component build. -->
+  <script src="https://unpkg.com/koin.js/dist/web-component.global.js"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const source = $("source"), system = $("system"), title = $("title");
+    const statusEl = $("status"), proxyBase = $("proxyBase");
+    const filePicker = $("filePicker"), filesEl = $("files");
+    const resolveBtn = $("resolveBtn"), playPickedBtn = $("playPickedBtn");
+    const playerWrap = $("playerWrap"), playerMount = $("playerMount");
+    const nowPlaying = $("nowPlaying"), sourceBadge = $("sourceBadge");
+
+    const ROM_EXTS = /\.(nes|fds|sfc|smc|fig|swc|md|gen|smd|sms|gg|gb|gbc|gba|zip|7z)$/i;
+    const DIRECT_RE = /^https:\/\/(?:www\.)?archive\.org\/download\/([^/]+)\/(.+)$/i;
+    const DETAILS_RE = /^https:\/\/(?:www\.)?archive\.org\/(?:details|metadata)\/([^/?#]+)/i;
+
+    function setStatus(msg, kind="") {
+      statusEl.textContent = msg;
+      statusEl.className = "status" + (kind ? " " + kind : "");
+    }
+
+    function inferSystem(name) {
+      const n = (name || "").toLowerCase().split("?")[0];
+      if (n.endsWith(".nes") || n.endsWith(".fds")) return "nes";
+      if (/\.(sfc|smc|fig|swc)$/.test(n)) return "snes";
+      if (/\.(md|gen|smd)$/.test(n)) return "genesis";
+      if (n.endsWith(".sms")) return "master_system";
+      if (n.endsWith(".gg")) return "game_gear";
+      if (n.endsWith(".gbc")) return "gbc";
+      if (n.endsWith(".gba")) return "gba";
+      if (n.endsWith(".gb")) return "gb";
+      return null;
+    }
+
+    function archiveParts(url) {
+      const m = url.match(DIRECT_RE);
+      if (!m) return null;
+      return { id: decodeURIComponent(m[1]), filename: decodeURIComponent(m[2]) };
+    }
+
+    function corsArchiveUrl(url) {
+      const p = archiveParts(url);
+      if (!p) return url;
+      return `https://cors.archive.org/cors/${encodeURIComponent(p.id)}/${p.filename.split("/").map(encodeURIComponent).join("/")}`;
+    }
+
+    function relayUrl(url) {
+      const base = proxyBase.value.trim().replace(/\/+$/, "");
+      return base ? `${base}/fetch?url=${encodeURIComponent(url)}` : null;
+    }
+
+    async function fetchJsonWithFallback(url) {
+      const candidates = [url];
+      const relayed = relayUrl(url);
+      if (relayed) candidates.push(relayed);
+      let lastErr;
+      for (const u of candidates) {
+        try {
+          const r = await fetch(u, { cache:"no-store" });
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return await r.json();
+        } catch (e) { lastErr = e; }
+      }
+      throw lastErr || new Error("Metadata fetch failed");
+    }
+
+    async function findUsableRomUrl(directUrl) {
+      // First try Archive's CORS endpoint, then normal /download, then optional relay.
+      const candidates = [];
+      if (archiveParts(directUrl)) candidates.push(corsArchiveUrl(directUrl));
+      candidates.push(directUrl);
+      const relayed = relayUrl(directUrl);
+      if (relayed) candidates.push(relayed);
+
+      let lastErr;
+      for (const u of [...new Set(candidates)]) {
+        try {
+          setStatus(`Checking remote file…`);
+          // GET a tiny range if supported. If Range is ignored this may fetch the file,
+          // but it is intentionally not stored by CartRelay.
+          const r = await fetch(u, {
+            headers: { Range:"bytes=0-31" },
+            cache:"no-store"
+          });
+          if (!(r.ok || r.status === 206)) throw new Error(`HTTP ${r.status}`);
+          await r.arrayBuffer();
+          return u;
+        } catch (e) {
+          lastErr = e;
+        }
+      }
+      throw new Error(
+        "The browser could not fetch this Archive file. " +
+        (proxyBase.value.trim()
+          ? `Relay also failed: ${lastErr?.message || "unknown error"}`
+          : "Deploy the included Archive relay worker and enter its URL under “Optional Archive CORS relay”.")
+      );
+    }
+
+    function mountPlayer(romUrl, sys, label, badge) {
+      playerMount.replaceChildren();
+      const el = document.createElement("retro-game-player");
+      el.setAttribute("rom-url", romUrl);
+      el.setAttribute("system", sys);
+      el.setAttribute("title", label || "Remote game");
+      el.setAttribute("rom-id", "cartrelay-" + Math.random().toString(36).slice(2));
+      playerMount.appendChild(el);
+
+      nowPlaying.textContent = label || "Remote game";
+      sourceBadge.textContent = badge || "remote";
+      playerWrap.classList.add("active");
+      playerWrap.scrollIntoView({ behavior:"smooth", block:"start" });
+      setStatus("Game handed to Koin.js. On mobile, its virtual controller should appear with the player.", "ok");
+    }
+
+    async function playDirect(directUrl, chosenName) {
+      resolveBtn.disabled = true;
+      playPickedBtn.disabled = true;
+      try {
+        const usable = await findUsableRomUrl(directUrl);
+        const sys = system.value === "auto" ? inferSystem(chosenName || directUrl) : system.value;
+        if (!sys) throw new Error("Could not infer the console. Choose a System manually.");
+        const label = title.value.trim() || chosenName?.replace(/\.[^.]+$/, "") || "Archive game";
+        mountPlayer(usable, sys, label, usable.includes("/fetch?") ? "Archive via no-store relay" : "Archive direct");
+      } catch (e) {
+        setStatus(e.message || String(e), "err");
+      } finally {
+        resolveBtn.disabled = false;
+        playPickedBtn.disabled = false;
+      }
+    }
+
+    async function resolveAndPlay() {
+      const raw = source.value.trim();
+      if (!raw) return setStatus("Paste an Internet Archive URL first.", "err");
+
+      filePicker.classList.remove("active");
+      playPickedBtn.style.display = "none";
+
+      if (DIRECT_RE.test(raw)) {
+        const p = archiveParts(raw);
+        return playDirect(raw, p?.filename);
+      }
+
+      const dm = raw.match(DETAILS_RE);
+      if (!dm) return setStatus("Use an archive.org/details/... item page or archive.org/download/... file URL.", "err");
+
+      resolveBtn.disabled = true;
+      try {
+        const id = decodeURIComponent(dm[1]);
+        setStatus("Reading Internet Archive item metadata…");
+        const meta = await fetchJsonWithFallback(`https://archive.org/metadata/${encodeURIComponent(id)}`);
+        const candidates = (meta.files || [])
+          .filter(f => f && f.name && ROM_EXTS.test(f.name) && f.private !== "true")
+          .sort((a,b) => {
+            const ao = a.source === "original" ? 0 : 1;
+            const bo = b.source === "original" ? 0 : 1;
+            return ao - bo || a.name.localeCompare(b.name);
+          });
+
+        if (!candidates.length) throw new Error("No obvious ROM/archive files were found in this item.");
+
+        filesEl.replaceChildren(...candidates.map(f => {
+          const o = document.createElement("option");
+          o.value = f.name;
+          const size = f.size ? ` · ${(Number(f.size)/1024/1024).toFixed(2)} MB` : "";
+          o.textContent = `${f.name}${size}${f.source === "original" ? " · original" : ""}`;
+          return o;
+        }));
+        filePicker.classList.add("active");
+
+        if (candidates.length === 1) {
+          const fn = candidates[0].name;
+          const url = `https://archive.org/download/${encodeURIComponent(id)}/${fn.split("/").map(encodeURIComponent).join("/")}`;
+          setStatus("One ROM-like file found; launching it…", "ok");
+          await playDirect(url, fn);
+        } else {
+          playPickedBtn.style.display = "";
+          playPickedBtn.dataset.identifier = id;
+          setStatus(`${candidates.length} ROM-like files found. Choose the right file, then tap “Play selected file”.`, "ok");
+        }
+      } catch (e) {
+        setStatus(e.message || String(e), "err");
+      } finally {
+        resolveBtn.disabled = false;
+      }
+    }
+
+    resolveBtn.addEventListener("click", resolveAndPlay);
+
+    playPickedBtn.addEventListener("click", async () => {
+      const id = playPickedBtn.dataset.identifier;
+      const fn = filesEl.value;
+      if (!id || !fn) return;
+      const url = `https://archive.org/download/${encodeURIComponent(id)}/${fn.split("/").map(encodeURIComponent).join("/")}`;
+      await playDirect(url, fn);
+    });
+
+    $("demoBtn").addEventListener("click", () => {
+      // MIT-licensed NES Diamond-Chase from TeneoPython01/nes-game-01.
+      // This control validates Koin/touch independently of Archive CORS.
+      const demo = "https://raw.githubusercontent.com/TeneoPython01/nes-game-01/main/game.nes";
+      system.value = "nes";
+      title.value = "NES Diamond-Chase (MIT demo)";
+      mountPlayer(demo, "nes", "NES Diamond-Chase (MIT demo)", "GitHub MIT homebrew");
+    });
+
+    $("closeBtn").addEventListener("click", () => {
+      playerMount.replaceChildren();
+      playerWrap.classList.remove("active");
+    });
+
+    // Keep mobile browser gestures away from the emulator area.
+    ["touchmove","gesturestart","gesturechange"].forEach(type => {
+      document.addEventListener(type, e => {
+        if (playerWrap.classList.contains("active") && playerWrap.contains(e.target)) e.preventDefault();
+      }, { passive:false });
+    });
+  </script>
+</body>
+</html>
