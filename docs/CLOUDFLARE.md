@@ -47,7 +47,8 @@ In **Advanced settings**, add these Cloudflare **build-time** variables:
 
 These values are intentionally stored in the Cloudflare build configuration instead of Git. The Worker runtime Variables/Secrets panel is a different environment: runtime variables are not a reliable source for the build/deploy shell. Fetchcade currently does not require any application runtime secret, R2 binding, D1 binding, or API token during a native Cloudflare Workers Builds deployment; Cloudflare's connected build integration supplies the deployment authentication.
 
-The screenshot's plain `npm run build` / `npx wrangler deploy` may work with Cloudflare's CI name override, but it does not generate the private custom-domain config and can produce a Wrangler name-mismatch warning. Use the explicit commands above.
+If **Enable Preview builds** is selected, give preview builds a separate Worker name and leave `FETCHCADE_CUSTOM_DOMAIN` empty for previews. Do not let a preview deployment try to claim the production custom domain. The simplest first setup is to leave Preview builds off, confirm production deploys, and add a separate preview Worker later.
+
 ## Cloudflare Workers Builds / Git deploys
 
 To deploy automatically after pushes to `main`:
