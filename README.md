@@ -1,9 +1,7 @@
 # Fetchcade
 
-![Fetchcade home screen](docs/screenshots/home.png)
-![Local cache controls](docs/screenshots/cache-controls.png)
-![Recent games and resume](docs/screenshots/recent-games.png)
-![Footer and legal reminder](docs/screenshots/footer-legal.png)
+![Fetchcade home with recent games](docs/screenshots/home-recent.png)
+![In-game player session](docs/screenshots/player-session.png)
 
 **Fetch. Play. No server.**
 

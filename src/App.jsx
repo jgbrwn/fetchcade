@@ -475,6 +475,7 @@ export default function App() {
   const [cacheInfo, setCacheInfo] = useState({ available: cacheStorageAvailable(), count: 0, names: [] });
   const [cacheMessage, setCacheMessage] = useState("");
   const [aboutOpen, setAboutOpen] = useState(false);
+  const [gameStarted, setGameStarted] = useState(false);
   const [removeGameTarget, setRemoveGameTarget] = useState(null);
   const [skipRemoveConfirmation, setSkipRemoveConfirmation] = useState(false);
   const searchToken = useRef(0);
@@ -604,6 +605,7 @@ export default function App() {
       }
       if (token !== sessionToken.current) return;
       const gameTitle = label?.trim() || title.trim() || displayFileName(filename || url).replace(/\.[^.]+$/, "") || "Archive game";
+      setGameStarted(false);
       setPlayer({
         key: `${playable.url}-${Date.now()}`,
         url: playable.url,
@@ -846,7 +848,11 @@ export default function App() {
 
   function closePlayer() {
     unmountPlayerAndReturnHome();
-    setDirectStatus({ message: "Session stopped. Koin is unmounted so its emulator resources can be released.", kind: "" });
+    setDirectStatus({ message: gameStarted
+      ? "Session stopped. Koin is unmounted so its emulator resources can be released."
+      : "Loading canceled. Koin is unmounted and nothing was cached.",
+      kind: "" });
+    setGameStarted(false);
     refreshCacheInfo();
   }
 
@@ -1028,7 +1034,7 @@ export default function App() {
                 <h2 id="player-heading">{player.title}</h2>
                 <p className="player-meta"><span className="player-system">{player.system}</span> {displayFileName(player.filename)} {player.cacheId && <span className="cache-badge">· local cache on</span>}</p>
               </div>
-              <button className="button-secondary close-button" type="button" onClick={closePlayer}>Stop session</button>
+              <button className="button-secondary close-button" type="button" onClick={closePlayer}>{gameStarted ? "Stop session" : "Cancel loading"}</button>
             </div>
             <div className="player-mount">
               <PlayerErrorBoundary onError={handlePlayerError}>
@@ -1045,6 +1051,7 @@ export default function App() {
                   system={player.system}
                   title={player.title}
                   onReady={() => {
+                    setGameStarted(true);
                     setDirectStatus({ message: "Ready. On a phone, open Koin's controls/fullscreen affordance and rotate landscape if helpful.", kind: "success" });
                     recordRecentGame(player);
                   }}
